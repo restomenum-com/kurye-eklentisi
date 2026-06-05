@@ -24,9 +24,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.
+  // `level` (info|success|warning|error) → restoyeni toast stilini seçer.
   if (envlp.hook === 'packet.sendToCourier') {
     const cfg = await getConfig(env, envlp.serverId);
-    if (!cfg?.courierUrl) return Response.json({ success: false, message: 'Kurye adresi ayarlı değil' });
+    if (!cfg?.courierUrl) return Response.json({ success: false, level: 'warning', message: 'Kurye adresi ayarlı değil' });
     try {
       const r = await fetch(cfg.courierUrl, {
         method: 'POST',
@@ -44,12 +45,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         }),
         signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
       });
-      if (!r.ok) return Response.json({ success: false, message: 'Kurye yanıt vermedi' });
-      return Response.json({ success: true, message: 'Kuryeye gönderildi' });
+      if (!r.ok) return Response.json({ success: false, level: 'error', message: 'Kurye yanıt vermedi' });
+      return Response.json({ success: true, level: 'success', message: 'Kuryeye gönderildi' });
     } catch {
-      return Response.json({ success: false, message: 'Kuryeye ulaşılamadı' });
+      return Response.json({ success: false, level: 'error', message: 'Kuryeye ulaşılamadı' });
     }
   }
 
-  return Response.json({ success: false, message: 'Bilinmeyen aksiyon' });
+  return Response.json({ success: false, level: 'error', message: 'Bilinmeyen aksiyon' });
 };
