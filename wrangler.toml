@@ -12,6 +12,6 @@ preview_id = "7bd7996f3eb24495b539a5e2b43cd231"
 
 # Gizli olmayan değişken (RESTOMENUM_BASE) burada olabilir; gizliler (CLIENT_SECRET) dashboard/secret ile.
 [vars]
-RESTOMENUM_BASE = "https://plugins-3y3x7nqe5a-ew.a.run.app"
+RESTOMENUM_BASE = "https://sandbox.plugins.restomenum.app"
 PLUGIN_ID = "9bb51324-d917-4d71-8c8f-ab5915d3af42"   # portaldaki pluginId (gizli değil)
 # CLIENT_SECRET → `npx wrangler pages secret put CLIENT_SECRET` (GİZLİ, buraya yazma)
