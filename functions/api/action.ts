@@ -46,7 +46,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
       });
       if (!r.ok) return Response.json({ success: false, level: 'error', message: 'Kurye yanıt vermedi' });
-      return Response.json({ success: true, level: 'warning', message: 'Kuryeye gönderildi (TEST: warning)' }); // GEÇİCİ TEST — geri alınacak
+      return Response.json({ success: false, level: 'error', message: 'Kuryeye gönderilemedi (TEST: error)' }); // GEÇİCİ TEST — geri alınacak
     } catch {
       return Response.json({ success: false, level: 'error', message: 'Kuryeye ulaşılamadı' });
     }
