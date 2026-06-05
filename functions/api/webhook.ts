@@ -1,8 +1,6 @@
-// Restomenum webhook alıcısı (Pages Function). Gelen event → tenant'ın kurye URL'ine map'lenmiş forward.
-//
-// Akış: ham gövde → serverId → install.webhookSecret ile HMAC (Web Crypto) doğrula → idempotency →
-//       mapEventPayload (tutarlı + scope-gated, ham veri yok) → courierUrl'e POST →
-//       başarı 200 (+markProcessed) / başarısız 5xx (retry, mark YOK).
+// Restomenum webhook alıcısı (Pages Function). İki tür istek (imza doğrulaması ortak):
+//   - `type:'action'` → UI buton action-hook (senkron, JSON {success,message} döner). Ör: packet.sendToCourier.
+//   - event (packet.created…) → idempotency → mapEventPayload → courierUrl'e forward (200/5xx retry).
 import { verifySignature } from '../../lib/sig';
 import { getInstall, getConfig, wasProcessed, markProcessed, type Env } from '../../lib/kv';
 import { mapEventPayload } from '../../lib/mapPayload';
@@ -24,6 +22,33 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   if (!(await verifySignature(inst.webhookSecret, raw, request.headers.get('x-restomenum-signature')))) {
     return new Response('bad signature', { status: 401 }); // imza geçersiz → reddet
+  }
+
+  // ── UI action-hook (paket detay buton tıklaması) — SENKRON, JSON {success,message} döner ──
+  // (Event akışından ayrı: autoForward/idempotency uygulanmaz; kullanıcı manuel tetikler.)
+  if (envlp.type === 'action') {
+    if (envlp.hook === 'packet.sendToCourier') {
+      const acfg = await getConfig(env, envlp.serverId);
+      if (!acfg?.courierUrl) return Response.json({ success: false, message: 'Kurye adresi ayarlı değil' });
+      try {
+        const r = await fetch(acfg.courierUrl, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-restomenum-plugin': 'kurye',
+            'x-restomenum-event': 'manual.sendToCourier',
+            'x-restomenum-server-id': String(envlp.serverId || ''),
+          },
+          body: JSON.stringify({ event: 'manual.sendToCourier', serverId: envlp.serverId, packetId: envlp.packetId ?? null, occurredAt: envlp.occurredAt }),
+          signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
+        });
+        if (!r.ok) return Response.json({ success: false, message: 'Kurye yanıt vermedi' });
+        return Response.json({ success: true, message: 'Kuryeye gönderildi' });
+      } catch {
+        return Response.json({ success: false, message: 'Kuryeye ulaşılamadı' });
+      }
+    }
+    return Response.json({ success: false, message: 'Bilinmeyen aksiyon' });
   }
 
   if (await wasProcessed(env, envlp.id)) return new Response('dup', { status: 200 }); // idempotency
