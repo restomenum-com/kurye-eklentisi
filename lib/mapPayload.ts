@@ -37,23 +37,13 @@ function mapCustomerAndAddress(c: any, install: Install): { customer?: any; addr
   };
 }
 
-// Seçenek adları → string array. Yeni payload `options`'ı zaten string array; eski iç yapı için fallback.
-function mapOptions(opts: any): string[] {
-  if (!Array.isArray(opts)) return [];
-  if (opts.every((x: any) => typeof x === 'string')) return opts; // yeni format: ["Acılı", …]
-  return opts // eski format: [{ data: [{ checked, title }] }]
-    .flatMap((g: any) => (g && Array.isArray(g.data)) ? g.data : [])
-    .filter((x: any) => x && x.checked)
-    .map((x: any) => x.title);
-}
-
 function mapProducts(orders: any): any[] {
   return (Array.isArray(orders) ? orders : []).map((v) => ({
     id: String(v?.id ?? ''),
-    name: v?.title ?? v?.product?.title ?? null, // ürün adı satır kökünde (eski payload uyumu için product.title fallback)
+    name: v?.title ?? null, // ürün adı satır kökünde
     price: Number(v?.lineTotal ?? 0), // satır fiyatı backend'de hesaplandı
     quantity: v?.quantity ?? null,
-    options: mapOptions(v?.options), // string array
+    options: Array.isArray(v?.options) ? v.options.filter((x: any) => typeof x === 'string') : [], // string array
   }));
 }
 

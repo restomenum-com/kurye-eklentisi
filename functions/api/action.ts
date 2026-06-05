@@ -40,7 +40,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         body: JSON.stringify({
           event: 'manual.sendToCourier',
           serverId: envlp.serverId,
-          packetId: envlp.packetId ?? null,
+          packetId: envlp.target?.id ?? null, // bağlam: target.id (paket id)
           occurredAt: envlp.occurredAt,
         }),
         signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
