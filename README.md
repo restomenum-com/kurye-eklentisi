@@ -89,6 +89,17 @@ build command yok). KV binding (`KV`) + vars (`RESTOMENUM_BASE`, `PLUGIN_ID`) + 
 | `CLIENT_SECRET` | Cloudflare secret | **gizli** |
 | `KV` | KV namespace binding | — |
 
+#### Restomenum plugin API base (`RESTOMENUM_BASE`)
+OAuth token exchange + Callback API bu base üzerinden çağrılır. Ortamına göre birini kullan:
+
+| Ortam | `RESTOMENUM_BASE` |
+|-------|-------------------|
+| **Sandbox / test** | `https://sandbox.plugins.restomenum.app` |
+| **Production** | `https://plugins.restomenum.app` |
+
+> Statü `callbackUrls` ve webhook imzaları Restomenum tarafından **mutlak** üretilir; bu base'i yalnız
+> OAuth exchange + Callback API çağrıların için kullanırsın. Test için sandbox, canlı için prod değerini ver.
+
 ### Yerel geliştirme
 ```bash
 cp .dev.vars.example .dev.vars     # değerleri doldur

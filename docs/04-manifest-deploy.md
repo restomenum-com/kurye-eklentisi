@@ -35,6 +35,17 @@ npm run deploy        # = wrangler pages deploy public  → https://<proje>.page
 ```
 - KV/secret'ı **Cloudflare dashboard**'tan da bağlayabilirsin (Pages projesi → Settings → Functions/Variables + KV bindings).
 - Deploy sonrası portal manifest URL'lerini (`/api/webhook`, `/api/connect`, `/embed`) gir + publish.
+
+### Restomenum plugin API base (`RESTOMENUM_BASE`)
+OAuth token exchange (`/plugin-api/oauth/token`) + Callback API çağrılarının gittiği base. Ortamına göre seç:
+
+| Ortam | `RESTOMENUM_BASE` |
+|-------|-------------------|
+| **Sandbox / test** | `https://sandbox.plugins.restomenum.app` |
+| **Production** | `https://plugins.restomenum.app` |
+
+> Test ederken `sandbox.plugins.restomenum.app`, canlıya alırken `plugins.restomenum.app` ver. Statü
+> `callbackUrls` Restomenum tarafından mutlak üretildiği için onları sen oluşturmazsın.
 > GitHub gerekmiyor — `wrangler` dosyaları doğrudan yükler. (Git entegrasyonu istersen ayrıca bağlanabilir.)
 
 ## Test
