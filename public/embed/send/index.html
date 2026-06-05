@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kuryeye Gönder</title>
+<!--
+  iframe action sayfası (type:page). restoyeni bu sayfayı modal'da açar.
+  App Bridge: getContext → packetId (action bağlamı), getSessionToken → JWT.
+  "Kuryeye Gönder" → POST /api/send (Bearer JWT) → kuryeye forward.
+-->
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;padding:24px;color:#1a1a1a;background:#fff}
+  .card{max-width:380px;margin:0 auto}
+  h3{margin:0 0 4px}
+  .muted{color:#666;font-size:13px;margin:0 0 18px}
+  .pid{font-family:ui-monospace,monospace;background:#f1f1f4;padding:2px 6px;border-radius:5px}
+  button{width:100%;padding:12px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  #status{margin-top:14px;font-size:14px;min-height:20px}
+  .ok{color:#16a34a}.err{color:#dc2626}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h3>📦 Kuryeye Gönder</h3>
+    <p class="muted">Paket <span class="pid" id="pid">—</span> kurye sistemine iletilecek.</p>
+    <button id="send" disabled>Kuryeye Gönder</button>
+    <div id="status"></div>
+  </div>
+
+<script>
+/* ── minimal App Bridge SDK (inline) ── */
+var pending = {}, seq = 0;
+window.addEventListener('message', function (e) {
+  var m = e.data; if (!m || m.type !== 'restomenum-bridge-response') return;
+  var r = pending[m.requestId]; if (r) { delete pending[m.requestId]; r(m.result); }
+});
+function call(action, params) {
+  return new Promise(function (resolve) {
+    var id = Date.now() + '-' + (seq++);
+    pending[id] = resolve;
+    window.parent.postMessage({ type: 'restomenum-bridge', requestId: id, action: action, params: params || {} }, '*'); // PROD: panel origin'i ver
+    setTimeout(function () { if (pending[id]) { delete pending[id]; resolve({ success: false, message: 'timeout' }); } }, 15000);
+  });
+}
+
+var TOKEN = '', PACKET_ID = null;
+var pidEl = document.getElementById('pid');
+var sendBtn = document.getElementById('send');
+var statusEl = document.getElementById('status');
+
+(async function init() {
+  var c = await call('getContext');                 // action bağlamı → target.id / packetId
+  PACKET_ID = (c && c.data && (c.data.packetId || (c.data.target && c.data.target.id))) || null;
+  pidEl.textContent = PACKET_ID || '—';
+
+  var t = await call('getSessionToken');
+  TOKEN = t && t.data && t.data.token;
+  if (!TOKEN) { statusEl.className = 'err'; statusEl.textContent = 'Oturum alınamadı (panel dışında mı?)'; return; }
+  sendBtn.disabled = false;
+})();
+
+sendBtn.onclick = async function () {
+  sendBtn.disabled = true;
+  statusEl.className = ''; statusEl.textContent = 'Gönderiliyor…';
+  try {
+    var r = await fetch('/api/send', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + TOKEN },
+      body: JSON.stringify({ packetId: PACKET_ID })
+    });
+    var j = await r.json();
+    statusEl.className = j && j.ok ? 'ok' : 'err';
+    statusEl.textContent = (j && j.message) || (j && j.ok ? '✓ Gönderildi' : 'Hata');
+    if (!(j && j.ok)) sendBtn.disabled = false;
+  } catch (e) {
+    statusEl.className = 'err'; statusEl.textContent = 'Bağlantı hatası';
+    sendBtn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
