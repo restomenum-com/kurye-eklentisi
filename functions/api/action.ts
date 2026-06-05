@@ -5,6 +5,8 @@
 // İmza şeması webhook ile aynı (install webhookSecret) → verifySignature ortak.
 import { verifySignature } from '../../lib/sig';
 import { getInstall, getConfig, type Env } from '../../lib/kv';
+import { fetchPacket } from '../../lib/restomenum';
+import { mapEventPayload } from '../../lib/mapPayload';
 
 const FORWARD_TIMEOUT_MS = 8000;
 
@@ -28,6 +30,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (envlp.hook === 'packet.sendToCourier') {
     const cfg = await getConfig(env, envlp.serverId);
     if (!cfg?.courierUrl) return Response.json({ success: false, level: 'warning', display: 'popup', message: 'Kurye adresi ayarlı değil' });
+    const packetId = envlp.target?.id;
+    if (!packetId) return Response.json({ success: false, level: 'error', display: 'popup', message: 'Paket bilgisi yok' });
+    // Action yalnız packetId taşır → dolu order'ı okuma ucundan çek (orders:read), kuryeye onu ilet.
+    const data = await fetchPacket(env, inst.apiKey, String(packetId));
+    if (!data) return Response.json({ success: false, level: 'error', display: 'popup', message: 'Paket detayı okunamadı' });
+    const order = mapEventPayload({ type: 'packet.created', id: '', serverId: envlp.serverId, occurredAt: Date.now(), data } as any, inst);
     try {
       const r = await fetch(cfg.courierUrl, {
         method: 'POST',
@@ -37,12 +45,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           'x-restomenum-event': 'manual.sendToCourier',
           'x-restomenum-server-id': String(envlp.serverId || ''),
         },
-        body: JSON.stringify({
-          event: 'manual.sendToCourier',
-          serverId: envlp.serverId,
-          packetId: envlp.target?.id ?? null, // bağlam: target.id (paket id)
-          occurredAt: envlp.occurredAt,
-        }),
+        body: JSON.stringify(order), // ← dolu kanonik order (products/customer/address/total…)
         signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
       });
       if (!r.ok) return Response.json({ success: false, level: 'error', display: 'popup', message: 'Kurye yanıt vermedi' });
