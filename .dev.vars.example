@@ -1,0 +1,4 @@
+# Yerel geliştirme için (wrangler pages dev .dev.vars'ı okur). Gerçek dosya: .dev.vars (gitignore'lu).
+RESTOMENUM_BASE=https://v1-3y3x7nqe5a-ew.a.run.app
+PLUGIN_ID=
+CLIENT_SECRET=
