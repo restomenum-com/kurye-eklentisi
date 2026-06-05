@@ -17,7 +17,8 @@ girer → "dinamik".
 ## Mimari — Cloudflare Pages (build YOK)
 ```
 functions/api/connect.ts   OAuth Connect: code → exchange → KV install kaydı
-functions/api/webhook.ts   packet.created → HMAC doğrula → tenant kurye URL'ine forward
+functions/api/webhook.ts   packet.created → HMAC doğrula → tenant kurye URL'ine forward (async)
+functions/api/action.ts    UI buton action-hook → manuel forward (senkron JSON {success})
 functions/api/config.ts    ayar ekranı backend (session token auth) — kurye URL oku/yaz
 public/index.html          landing
 public/embed/index.html    iframe ayar UI (App Bridge → /api/config)
@@ -41,7 +42,8 @@ wrangler.toml              Pages + KV binding + vars
 | Uç | Metot | Auth | İş |
 |----|-------|------|-----|
 | `/api/connect` | GET | code (redirect) | exchange → KV install |
-| `/api/webhook` | POST | HMAC imzası | packet.created → forward |
+| `/api/webhook` | POST | HMAC imzası | event (packet.created) → forward (async) |
+| `/api/action` | POST | HMAC imzası | UI buton action-hook (senkron JSON) |
 | `/api/config` | GET/POST | session token (JWT) | kurye URL oku/yaz |
 | `/embed/` | GET | — (iframe) | ayar ekranı |
 

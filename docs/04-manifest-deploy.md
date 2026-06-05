@@ -4,19 +4,28 @@
 ```jsonc
 { "version":"1.0.0",
   "webhookUrl":"https://<proje>.pages.dev/api/webhook",
+  "actionUrl":"https://<proje>.pages.dev/api/action",
   "connectUrl":"https://<proje>.pages.dev/api/connect",
   "manifest": {
     "events":["packet.created"],
-    "requestedScopes":["events:subscribe","orders:read","customers:read","packets:status","ui:page"],
+    "requestedScopes":["events:subscribe","orders:read","customers:read","packets:status","ui:button","ui:page"],
     "pages":[{ "id":"settings", "customUiOrigin":"https://<proje>.pages.dev", "path":"/embed", "title":{"tr":"Kurye Ayarları"} }],
-    "settingsPageId":"settings"
+    "settingsPageId":"settings",
+    "buttons":[
+      { "id":"send-to-courier", "slot":"packet.detail.actions",
+        "label":{"tr":"Kuryeye Gönder","en":"Send to courier"}, "icon":"truck",
+        "action":{ "type":"hook", "hook":"packet.sendToCourier" },
+        "confirm":{"tr":"Bu paketi kuryeye göndereyim mi?"} }
+    ]
   }
 }
 ```
-- **Same-apex:** `webhookUrl` + `connectUrl` + `pages[].customUiOrigin` hepsi `<proje>.pages.dev` (tek domain) ✓.
+- **Same-apex:** `webhookUrl` + `actionUrl` + `connectUrl` + `pages[].customUiOrigin` hepsi `<proje>.pages.dev` (tek domain) ✓.
 - Portal'da **client_secret üret** (bir kez) → Cloudflare secret `CLIENT_SECRET`.
 - **`customers:read`** — kurye teslim adresi/ad/telefon için (yoksa `customer`/`address` gelmez); kurulumda PII consent ister.
 - **`packets:status`** — paket durumu callback'i için (statü URL'leri yalnız bu izinle order'a eklenir).
+- **`ui:button`** — paket detayında "Kuryeye Gönder" butonu için. Tıklayınca **`actionUrl`**'e (`/api/action`) imzalı senkron POST → manuel forward.
+- **`actionUrl`** (opsiyonel ama önerilen): action-hook'lar buraya gelir (webhook'tan ayrı — senkron). Verilmezse `webhookUrl`'e `type:'action'` ile fallback.
 
 ## Cloudflare Pages deploy (wrangler — GitHub'sız)
 ```bash
