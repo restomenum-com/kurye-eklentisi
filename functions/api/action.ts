@@ -25,6 +25,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({ success: false, message: 'bad signature' }, { status: 401 });
   }
 
+  // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
+  if (envlp.type === 'hook') {
+    if (envlp.event === 'table.close') {
+      // Demo gate: form'da "kurye çağrıldı" onayı yoksa masa kapatmayı ENGELLE.
+      const courierCalled = envlp.formData?.courierCalled === true;
+      if (!courierCalled) {
+        return Response.json({ decision: 'deny', message: 'Önce kuryeyi çağırın — masa kapatılamaz.' });
+      }
+      return Response.json({ decision: 'allow', message: 'Kurye teyit edildi, masa kapatılabilir.', attach: { note: 'kurye-ok' } });
+    }
+    return Response.json({ decision: 'allow', message: 'Bilinmeyen hook — geçildi.' });
+  }
+
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.
   // `level` → renk (info|success|warning|error); `display` → sunum (toast | popup). İkisini de eklenti seçer.
   if (envlp.hook === 'packet.sendToCourier') {
