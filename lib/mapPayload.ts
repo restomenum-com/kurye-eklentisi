@@ -40,7 +40,7 @@ function mapCustomerAndAddress(c: any, install: Install): { customer?: any; addr
 function mapProducts(orders: any): any[] {
   return (Array.isArray(orders) ? orders : []).map((v) => ({
     id: String(v?.id ?? ''),
-    name: v?.product?.title ?? null,
+    name: v?.title ?? v?.product?.title ?? null, // ürün adı satır kökünde (eski payload uyumu için product.title fallback)
     price: Number(v?.lineTotal ?? 0), // satır fiyatı backend'de hesaplandı
     quantity: v?.quantity ?? null,
     options: (Array.isArray(v?.options) ? v.options : [])
