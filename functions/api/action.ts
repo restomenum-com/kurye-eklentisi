@@ -36,6 +36,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const data = await fetchPacket(env, inst.apiKey, String(packetId));
     if (!data) return Response.json({ success: false, level: 'error', display: 'popup', message: 'Paket detayı okunamadı' });
     const order = mapEventPayload({ type: 'packet.created', id: '', serverId: envlp.serverId, occurredAt: Date.now(), data } as any, inst);
+    // Declarative form çıktısı (type:'form' butonu) → kurye order'ına ekle.
+    if (envlp.formData?.note) order.courierNote = String(envlp.formData.note);
+    if (envlp.formData?.priority) order.priority = String(envlp.formData.priority);
     try {
       const r = await fetch(cfg.courierUrl, {
         method: 'POST',
