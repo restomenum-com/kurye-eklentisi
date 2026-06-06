@@ -19,7 +19,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return new Response('bad json', { status: 400 });
   }
 
-  const inst = await getInstall(env, envlp.serverId);
+  const inst = await getInstall(env, envlp.tenantId);
   if (!inst) return new Response('unknown tenant', { status: 404 });
 
   if (!(await verifySignature(inst.webhookSecret, raw, request.headers.get('x-restomenum-signature')))) {
@@ -28,7 +28,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   if (await wasProcessed(env, envlp.id)) return new Response('dup', { status: 200 }); // idempotency
 
-  const cfg = await getConfig(env, envlp.serverId);
+  const cfg = await getConfig(env, envlp.tenantId);
   if (!cfg?.courierUrl) {
     await markProcessed(env, envlp.id); // ayar yok → yapılacak iş yok, ack
     return new Response('no courier url', { status: 200 });
@@ -49,7 +49,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         'content-type': 'application/json',
         'x-restomenum-plugin': 'kurye',
         'x-restomenum-event': String(envlp.type || ''),
-        'x-restomenum-server-id': String(envlp.serverId || ''), // tenant ayrımı (body order — serverId taşımaz)
+        'x-restomenum-server-id': String(envlp.tenantId || ''), // tenant ayrımı (body order — serverId taşımaz)
       },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS), // 8s sonra abort → handler asılmaz

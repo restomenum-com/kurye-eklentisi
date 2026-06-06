@@ -19,7 +19,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({ success: false, message: 'bad json' }, { status: 400 });
   }
 
-  const inst = await getInstall(env, envlp.serverId);
+  const inst = await getInstall(env, envlp.tenantId);
   if (!inst) return Response.json({ success: false, message: 'unknown tenant' }, { status: 404 });
   if (!(await verifySignature(inst.webhookSecret, raw, request.headers.get('x-restomenum-signature')))) {
     return Response.json({ success: false, message: 'bad signature' }, { status: 401 });
@@ -28,12 +28,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {
     // DEBUG: gelen hook isteğini CANLI görmek için kurye URL'ine olduğu gibi yönlendir (best-effort, gate'i bloklamaz).
-    const dbgCfg = await getConfig(env, envlp.serverId);
+    const dbgCfg = await getConfig(env, envlp.tenantId);
     if (dbgCfg?.courierUrl) {
       try {
         await fetch(dbgCfg.courierUrl, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-restomenum-plugin': 'kurye', 'x-restomenum-event': 'hook.received', 'x-restomenum-server-id': String(envlp.serverId || '') },
+          headers: { 'content-type': 'application/json', 'x-restomenum-plugin': 'kurye', 'x-restomenum-event': 'hook.received', 'x-restomenum-server-id': String(envlp.tenantId || '') },
           body: JSON.stringify(envlp),
           signal: AbortSignal.timeout(5000),
         });
@@ -53,14 +53,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.
   // `level` → renk (info|success|warning|error); `display` → sunum (toast | popup). İkisini de eklenti seçer.
   if (envlp.hook === 'packet.sendToCourier') {
-    const cfg = await getConfig(env, envlp.serverId);
+    const cfg = await getConfig(env, envlp.tenantId);
     if (!cfg?.courierUrl) return Response.json({ success: false, level: 'warning', display: 'popup', message: 'Kurye adresi ayarlı değil' });
     const packetId = envlp.target?.id;
     if (!packetId) return Response.json({ success: false, level: 'error', display: 'popup', message: 'Paket bilgisi yok' });
     // Action yalnız packetId taşır → dolu order'ı okuma ucundan çek (orders:read), kuryeye onu ilet.
     const data = await fetchPacket(env, inst.apiKey, String(packetId));
     if (!data) return Response.json({ success: false, level: 'error', display: 'popup', message: 'Paket detayı okunamadı' });
-    const order = mapEventPayload({ type: 'packet.created', id: '', serverId: envlp.serverId, occurredAt: Date.now(), data } as any, inst);
+    const order = mapEventPayload({ type: 'packet.created', id: '', serverId: envlp.tenantId, occurredAt: Date.now(), data } as any, inst);
     // Declarative form çıktısı (type:'form' butonu) → tüm form alanlarını kurye order'ına ekle.
     if (envlp.formData && typeof envlp.formData === 'object') order.formData = envlp.formData;
     try {
@@ -70,7 +70,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           'content-type': 'application/json',
           'x-restomenum-plugin': 'kurye',
           'x-restomenum-event': 'manual.sendToCourier',
-          'x-restomenum-server-id': String(envlp.serverId || ''),
+          'x-restomenum-server-id': String(envlp.tenantId || ''),
         },
         body: JSON.stringify(order), // ← dolu kanonik order (products/customer/address/total…)
         signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
