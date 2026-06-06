@@ -27,6 +27,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {
+    // DEBUG: gelen hook isteğini CANLI görmek için kurye URL'ine olduğu gibi yönlendir (best-effort, gate'i bloklamaz).
+    const dbgCfg = await getConfig(env, envlp.serverId);
+    if (dbgCfg?.courierUrl) {
+      try {
+        await fetch(dbgCfg.courierUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-restomenum-plugin': 'kurye', 'x-restomenum-event': 'hook.received', 'x-restomenum-server-id': String(envlp.serverId || '') },
+          body: JSON.stringify(envlp),
+          signal: AbortSignal.timeout(5000),
+        });
+      } catch { /* debug forward — sessiz geç */ }
+    }
     if (envlp.event === 'table.close') {
       // Demo gate: form'da "kurye çağrıldı" onayı yoksa masa kapatmayı ENGELLE.
       const courierCalled = envlp.formData?.courierCalled === true;
