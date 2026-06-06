@@ -11,7 +11,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     const d = await exchangeCode(env, code);
-    await saveInstall(env, d.serverId, {
+    await saveInstall(env, d.tenantId, {
       apiKey: d.apiKey,
       webhookSecret: d.webhookSecret,
       scopes: d.scopes,

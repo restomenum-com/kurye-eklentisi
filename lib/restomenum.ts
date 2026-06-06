@@ -22,7 +22,7 @@ export async function fetchPacket(env: Env, apiKey: string, packetId: string): P
 export type ExchangeResult = {
   apiKey: string;
   webhookSecret: string;
-  serverId: string;
+  tenantId: string;
   scopes: string[];
   pluginId: string;
   version: string;

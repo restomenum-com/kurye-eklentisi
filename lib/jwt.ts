@@ -36,9 +36,9 @@ export async function verifySessionToken(bearer: string | null, env: Env): Promi
   if (!header || header.alg !== 'HS256') return null;            // alg-confusion / "none" koruması
   if (!payload || payload.iss !== 'restomenum') return null;
   if (payload.aud !== env.PLUGIN_ID) return null;
-  if (!payload.serverId) return null;
+  if (!payload.tenantId) return null;
 
-  const inst = await getInstall(env, payload.serverId);
+  const inst = await getInstall(env, payload.tenantId);
   if (!inst) return null;
 
   // imza doğrula (HMAC-SHA256 over "header.payload" with webhookSecret)
@@ -57,5 +57,5 @@ export async function verifySessionToken(bearer: string | null, env: Env): Promi
   if (typeof payload.exp === 'number' && now > payload.exp) return null;          // süresi dolmuş
   if (typeof payload.iat === 'number' && payload.iat - now > 60) return null;     // ileri-tarihli (60s skew)
 
-  return { serverId: String(payload.serverId), pluginId: String(payload.pluginId), uid: payload.sub };
+  return { serverId: String(payload.tenantId), pluginId: String(payload.pluginId), uid: payload.sub };
 }
