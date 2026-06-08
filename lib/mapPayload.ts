@@ -76,11 +76,34 @@ function mapPacketOrder(data: any, occurredAt: number | undefined, install: Inst
   return order;
 }
 
-/** packet.created → kurye `order`. Diğer event'ler → minimal zarf. */
+/** table.closed → kurye `order` (dine-in masa kapanışı). Paket ile aynı order modeli (DRY); masaya özgü alanlar. */
+function mapTableClosed(data: any, occurredAt: number | undefined, install: Install) {
+  const { customer, address } = mapCustomerAndAddress(data?.customer, install);
+  const order: any = {
+    id: String(data?.tableId ?? ''),
+    tableName: data?.tableName ?? null,
+    products: mapProducts(data?.orders),
+    source: 'table',
+    totalAmount: Number(data?.total ?? 0),
+    totalDiscount: Number(data?.totalDiscount ?? 0),
+    paymentMethod: data?.total == data?.paid ? 'Online' : 'Belirtilmemiş',
+    dailyOrderNo: data?.docNo ? String(data.docNo) : null,
+    personCount: data?.personCount ?? null,
+    location: data?.location ?? null,
+    createdAt: formatCreatedAt(occurredAt),
+  };
+  if (customer) order.customer = customer; // customers:read yoksa eklenmez
+  if (address) order.address = address;
+  return order;
+}
+
+/** Restomenum event → kurye `order`. Bilinmeyen tip → minimal zarf. */
 export function mapEventPayload(env: Envelope, install: Install) {
   switch (env.type) {
     case 'packet.created':
       return mapPacketOrder(env.data || {}, env.occurredAt, install);
+    case 'table.closed':
+      return mapTableClosed(env.data || {}, env.occurredAt, install);
     default:
       return { event: env.type, eventId: env.id, serverId: env.serverId, occurredAt: env.occurredAt ?? null };
   }
