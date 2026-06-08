@@ -53,6 +53,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.
   // `level` → renk (info|success|warning|error); `display` → sunum (toast | popup). İkisini de eklenti seçer.
   if (envlp.hook === 'packet.sendToCourier') {
+    // Per-user yetki (actor): yalnız 'manager' rolü kurye gönderebilir. `actor` Restomenum'un imzaladığı
+    // gövdede gelir (imza yukarıda doğrulandı → güvenilir, tarayıcı forge edemez). actor.userId ile
+    // istenirse daha ince izin de kurulabilir; burada kaba rol yeterli.
+    if (envlp.actor?.role !== 'manager') {
+      return Response.json({ success: false, level: 'warning', display: 'popup', message: 'Bu işlem için yönetici (manager) yetkisi gerekir' });
+    }
     const cfg = await getConfig(env, envlp.tenantId);
     if (!cfg?.courierUrl) return Response.json({ success: false, level: 'warning', display: 'popup', message: 'Kurye adresi ayarlı değil' });
     const packetId = envlp.target?.id;
