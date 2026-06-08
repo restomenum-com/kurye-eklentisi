@@ -102,8 +102,11 @@ export function mapEventPayload(env: Envelope, install: Install) {
   switch (env.type) {
     case 'packet.created':
       return mapPacketOrder(env.data || {}, env.occurredAt, install);
+    case 'packet.closed':
+      // Paket kapanışı: packet.created ile aynı kanonik şekil → aynı mapper; `status` (Delivered/Rejected…) ekle.
+      return { ...mapPacketOrder(env.data || {}, env.occurredAt, install), status: (env.data as any)?.status ?? null };
     case 'table.closed':
-      return mapTableClosed(env.data || {}, env.occurredAt, install);
+      return { ...mapTableClosed(env.data || {}, env.occurredAt, install), status: (env.data as any)?.status ?? null };
     default:
       return { event: env.type, eventId: env.id, serverId: env.serverId, occurredAt: env.occurredAt ?? null };
   }
