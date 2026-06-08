@@ -12,6 +12,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const ctx = await verifySessionToken(request.headers.get('authorization'), env);
   if (!ctx) return Response.json({ ok: false, message: 'Oturum doğrulanamadı' }, { status: 401 });
 
+  // Per-user yetki: yalnız 'manager' rolü kurye gönderebilir. role, session token (JWT) içinde imzalı gelir
+  // (verifySessionToken doğruladı → güvenilir). action.ts'teki actor.role kontrolüyle aynı politika.
+  if (ctx.role !== 'manager') {
+    return Response.json({ ok: false, message: 'Bu işlem için yönetici (manager) yetkisi gerekir' }, { status: 403 });
+  }
+
   const body: any = await request.json().catch(() => ({}));
   const packetId = body?.packetId ? String(body.packetId) : null;
   if (!packetId) return Response.json({ ok: false, message: 'Paket bilgisi yok' });

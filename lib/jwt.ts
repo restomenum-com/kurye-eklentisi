@@ -3,7 +3,7 @@
 // Doğrulama: payload'tan serverId → o install'ın webhookSecret'ı ile imza + alg/iss/aud/exp kontrolü.
 import { getInstall, type Env } from './kv';
 
-export type SessionCtx = { serverId: string; pluginId: string; uid?: string };
+export type SessionCtx = { serverId: string; pluginId: string; uid?: string; role?: string };
 
 function b64urlToBytes(s: string): Uint8Array {
   const t = s.replace(/-/g, '+').replace(/_/g, '/');
@@ -52,10 +52,10 @@ export async function verifySessionToken(bearer: string | null, env: Env): Promi
   const ok = await crypto.subtle.verify('HMAC', key, b64urlToBytes(sig), new TextEncoder().encode(`${h}.${p}`));
   if (!ok) return null;
 
-  // exp / iat
+  // exp / iat — exp ZORUNLU (kısa-ömürlü token; exp'siz = kalıcı kredensiyel → red)
   const now = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp === 'number' && now > payload.exp) return null;          // süresi dolmuş
+  if (typeof payload.exp !== 'number' || now > payload.exp) return null;          // exp yok/süresi dolmuş
   if (typeof payload.iat === 'number' && payload.iat - now > 60) return null;     // ileri-tarihli (60s skew)
 
-  return { serverId: String(payload.tenantId), pluginId: String(payload.pluginId), uid: payload.sub };
+  return { serverId: String(payload.tenantId), pluginId: String(payload.pluginId), uid: payload.sub, role: payload.role };
 }
