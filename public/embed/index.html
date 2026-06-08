@@ -90,6 +90,14 @@
         </div>
       </div>
 
+      <label class="fld" for="mirror" style="margin-top:18px;">🧪 Test aynası (webhook.site) — opsiyonel</label>
+      <input id="mirror" type="url" placeholder="https://webhook.site/xxxxxxxx (boş = kapalı)" />
+      <small style="display:block;color:var(--muted);font-size:12px;margin-top:6px;">
+        Doluysa Restomenum'dan gelen <b>tüm istekler</b> (event/action/hook) ayrıca buraya yansıtılır →
+        webhook'ların düştüğünü test edebilirsiniz. Ayna istekleri <code>X-Kurye-Mirror: 1</code> başlığı +
+        gövdede <code>_mirror:true</code> ile işaretlidir (normal kurye gönderiminden ayrı).
+      </small>
+
       <div class="actions">
         <button id="save" disabled>Kaydet</button>
         <span id="status">Yükleniyor…</span>
@@ -122,6 +130,7 @@ function call(action, params) {
 var TOKEN = '';
 var urlEl = document.getElementById('url');
 var autoEl = document.getElementById('autoForward');
+var mirrorEl = document.getElementById('mirror');
 var saveBtn = document.getElementById('save');
 var statusEl = document.getElementById('status');
 
@@ -134,6 +143,7 @@ var statusEl = document.getElementById('status');
   var j = await r.json();
   urlEl.value = (j && j.courierUrl) || '';
   autoEl.checked = !(j && j.autoForward === false); // default açık
+  mirrorEl.value = (j && j.mirrorUrl) || '';
   statusEl.textContent = '';
   saveBtn.disabled = false;
 })();
@@ -143,7 +153,7 @@ saveBtn.onclick = async function () {
   var r = await fetch('/api/config', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + TOKEN },
-    body: JSON.stringify({ courierUrl: urlEl.value, autoForward: autoEl.checked })
+    body: JSON.stringify({ courierUrl: urlEl.value, autoForward: autoEl.checked, mirrorUrl: mirrorEl.value })
   });
   var j = await r.json();
   statusEl.style.color = j && j.ok ? 'var(--ok)' : 'var(--err)';

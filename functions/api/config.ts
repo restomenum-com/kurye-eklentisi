@@ -8,7 +8,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const ctx = await verifySessionToken(request.headers.get('authorization'), env);
   if (!ctx) return Response.json({ error: 'unauthorized' }, { status: 401 });
   const cfg = await getConfig(env, ctx.serverId);
-  return Response.json({ ok: true, courierUrl: cfg?.courierUrl ?? '', autoForward: cfg?.autoForward !== false });
+  return Response.json({ ok: true, courierUrl: cfg?.courierUrl ?? '', autoForward: cfg?.autoForward !== false, mirrorUrl: cfg?.mirrorUrl ?? '' });
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -22,6 +22,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({ error: 'invalid_url', message: v.reason }, { status: 400 });
   }
   const autoForward = body?.autoForward !== false; // default açık; yalnız açıkça false ise kapalı
-  await saveConfig(env, ctx.serverId, { courierUrl, autoForward, updatedAt: Date.now() });
-  return Response.json({ ok: true, courierUrl, autoForward });
+
+  // mirrorUrl (TEST/DEBUG, opsiyonel): boş → kapalı. Doluysa courierUrl ile aynı SSRF guard'dan geçer.
+  const mirrorUrl = String(body?.mirrorUrl || '').trim();
+  if (mirrorUrl) {
+    const mv = validateCourierUrl(mirrorUrl);
+    if (!mv.ok) return Response.json({ error: 'invalid_mirror_url', message: mv.reason }, { status: 400 });
+  }
+
+  await saveConfig(env, ctx.serverId, { courierUrl, autoForward, mirrorUrl: mirrorUrl || undefined, updatedAt: Date.now() });
+  return Response.json({ ok: true, courierUrl, autoForward, mirrorUrl });
 };

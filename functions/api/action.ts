@@ -7,10 +7,11 @@ import { verifySignature } from '../../lib/sig';
 import { getInstall, getConfig, type Env } from '../../lib/kv';
 import { fetchPacket } from '../../lib/restomenum';
 import { mapEventPayload } from '../../lib/mapPayload';
+import { mirrorIncoming } from '../../lib/mirror';
 
 const FORWARD_TIMEOUT_MS = 8000;
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   const raw = await request.text(); // HAM gövde (imza için şart)
   let envlp: any;
   try {
@@ -20,10 +21,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const inst = await getInstall(env, envlp.tenantId);
+  const sigValid = inst ? await verifySignature(inst.webhookSecret, raw, request.headers.get('x-restomenum-signature')) : false;
+
+  // TEST/DEBUG aynası: senkron istek (action veya before-hook gate) ham haliyle webhook.site'a yansıtılır.
+  const mirrorKind = envlp.type === 'hook' ? 'hook' : 'action';
+  const mirrorEvent = envlp.type === 'hook' ? String(envlp.event || 'hook') : String(envlp.hook || envlp.type || 'action');
+  waitUntil(mirrorIncoming(env, envlp.tenantId, { kind: mirrorKind, event: mirrorEvent, rawBody: raw, signatureValid: sigValid }));
+
   if (!inst) return Response.json({ success: false, message: 'unknown tenant' }, { status: 404 });
-  if (!(await verifySignature(inst.webhookSecret, raw, request.headers.get('x-restomenum-signature')))) {
-    return Response.json({ success: false, message: 'bad signature' }, { status: 401 });
-  }
+  if (!sigValid) return Response.json({ success: false, message: 'bad signature' }, { status: 401 });
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {

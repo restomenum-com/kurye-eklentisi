@@ -6,11 +6,12 @@
 import { verifySignature } from '../../lib/sig';
 import { getInstall, getConfig, wasProcessed, markProcessed, type Env } from '../../lib/kv';
 import { mapEventPayload } from '../../lib/mapPayload';
+import { mirrorIncoming } from '../../lib/mirror';
 
 // Kurye URL'ine forward üst sınırı — yavaş/asılı kurye webhook handler'ını bloklamasın.
 const FORWARD_TIMEOUT_MS = 8000;
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   const raw = await request.text(); // HAM gövde (imza için şart — parse'tan önce)
   let envlp: any;
   try {
@@ -20,11 +21,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const inst = await getInstall(env, envlp.tenantId);
-  if (!inst) return new Response('unknown tenant', { status: 404 });
+  const sigValid = inst ? await verifySignature(inst.webhookSecret, raw, request.headers.get('x-restomenum-signature')) : false;
 
-  if (!(await verifySignature(inst.webhookSecret, raw, request.headers.get('x-restomenum-signature')))) {
-    return new Response('bad signature', { status: 401 }); // imza geçersiz → reddet
-  }
+  // TEST/DEBUG aynası: ham event'i (imzadan/idempotency'den bağımsız) webhook.site'a yansıt → "düştü mü" görünür.
+  waitUntil(mirrorIncoming(env, envlp.tenantId, { kind: 'webhook', event: String(envlp.type || ''), rawBody: raw, signatureValid: sigValid }));
+
+  if (!inst) return new Response('unknown tenant', { status: 404 });
+  if (!sigValid) return new Response('bad signature', { status: 401 }); // imza geçersiz → reddet
 
   if (await wasProcessed(env, envlp.id)) return new Response('dup', { status: 200 }); // idempotency
 
