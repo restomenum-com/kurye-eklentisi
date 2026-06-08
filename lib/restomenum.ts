@@ -19,6 +19,24 @@ export async function fetchPacket(env: Env, apiKey: string, packetId: string): P
   }
 }
 
+/**
+ * Mağazanın açık paketlerini çek (Callback API — `GET /plugin-api/packets/open`, install apiKey, orders:read).
+ * Özet liste döner (satır/müşteri yok); hata/yetki yoksa boş dizi.
+ */
+export async function fetchOpenPackets(env: Env, apiKey: string): Promise<any[]> {
+  try {
+    const r = await fetch(`${env.RESTOMENUM_BASE}/plugin-api/packets/open`, {
+      headers: { authorization: 'Bearer ' + apiKey, accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j?.success) return [];
+    return Array.isArray(j.data) ? j.data : [];
+  } catch {
+    return [];
+  }
+}
+
 export type ExchangeResult = {
   apiKey: string;
   webhookSecret: string;

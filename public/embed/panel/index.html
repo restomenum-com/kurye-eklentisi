@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kurye Paneli</title>
+<!--
+  iframe Custom UI sayfası (type:page, sol menü → sidebar.main). restoyeni bu sayfayı tam panelde açar.
+  App Bridge: getSessionToken → JWT. Veri: GET /api/packets (Bearer JWT) → açık paketler + kullanıcı role'ü.
+  "Kuryeye Gönder" → POST /api/send (manager-only; staff'a buton pasif + not).
+-->
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;padding:20px;color:#1a1a1a;background:#fafafa}
+  h3{margin:0 0 2px}
+  .muted{color:#666;font-size:13px;margin:0 0 16px}
+  .role{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:8px}
+  .role.manager{background:#dcfce7;color:#166534}.role.staff{background:#fef9c3;color:#854d0e}
+  .list{display:flex;flex-direction:column;gap:10px;max-width:640px}
+  .pk{background:#fff;border:1px solid #ececf0;border-radius:11px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .pk .info{min-width:0}
+  .pk .top{font-weight:600}
+  .pk .sub{color:#666;font-size:13px;margin-top:2px}
+  .chan{font-family:ui-monospace,monospace;background:#f1f1f4;padding:1px 6px;border-radius:5px;font-size:12px}
+  button{padding:9px 14px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+  button:disabled{opacity:.45;cursor:default}
+  #status{margin:10px 0 0;font-size:14px;min-height:20px}
+  .empty{color:#777;padding:24px 0}
+  .ok{color:#16a34a}.err{color:#dc2626}
+  .note{font-size:12px;color:#854d0e;margin-top:4px}
+</style>
+</head>
+<body>
+  <h3>🛵 Kurye Paneli <span id="role" class="role"></span></h3>
+  <p class="muted">Açık paketler — manuel kuryeye gönderim.</p>
+  <div id="status"></div>
+  <div id="list" class="list"></div>
+
+<script>
+/* ── minimal App Bridge SDK (inline) ── */
+var pending = {}, seq = 0;
+window.addEventListener('message', function (e) {
+  var m = e.data; if (!m || m.type !== 'restomenum-bridge-response') return;
+  var r = pending[m.requestId]; if (r) { delete pending[m.requestId]; r(m.result); }
+});
+function call(action, params) {
+  return new Promise(function (resolve) {
+    var id = Date.now() + '-' + (seq++);
+    pending[id] = resolve;
+    window.parent.postMessage({ type: 'restomenum-bridge', requestId: id, action: action, params: params || {} }, '*'); // PROD: panel origin'i ver
+    setTimeout(function () { if (pending[id]) { delete pending[id]; resolve({ success: false, message: 'timeout' }); } }, 15000);
+  });
+}
+
+var TOKEN = '', ROLE = 'staff';
+var statusEl = document.getElementById('status');
+var listEl = document.getElementById('list');
+var roleEl = document.getElementById('role');
+
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
+
+function render(packets){
+  listEl.innerHTML = '';
+  if (!packets.length){ listEl.innerHTML = '<div class="empty">Açık paket yok.</div>'; return; }
+  var isManager = ROLE === 'manager';
+  packets.forEach(function(p){
+    var row = document.createElement('div'); row.className = 'pk';
+    var chan = p.entegrasyon ? '<span class="chan">'+esc(p.entegrasyon)+'</span>' : '';
+    row.innerHTML =
+      '<div class="info">'
+      + '<div class="top">#'+esc(p.docNo)+' · '+esc(p.itemCount)+' ürün · '+esc(p.total)+' ₺</div>'
+      + '<div class="sub">'+chan+' ödenen: '+esc(p.paid)+' ₺'+(p.totalDiscount?(' · indirim: '+esc(p.totalDiscount)+' ₺'):'')+'</div>'
+      + (isManager ? '' : '<div class="note">Gönderim için yönetici (manager) yetkisi gerekir.</div>')
+      + '</div>';
+    var btn = document.createElement('button');
+    btn.textContent = 'Kuryeye Gönder';
+    btn.disabled = !isManager;
+    btn.onclick = function(){ send(p.packetId, btn); };
+    row.appendChild(btn);
+    listEl.appendChild(row);
+  });
+}
+
+async function send(packetId, btn){
+  btn.disabled = true;
+  statusEl.className = ''; statusEl.textContent = 'Gönderiliyor…';
+  try {
+    var r = await fetch('/api/send', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + TOKEN },
+      body: JSON.stringify({ packetId: packetId })
+    });
+    var j = await r.json();
+    statusEl.className = j && j.ok ? 'ok' : 'err';
+    statusEl.textContent = (j && j.message) || (j && j.ok ? '✓ Gönderildi' : 'Hata');
+    if (j && j.ok) { setTimeout(load, 600); } else { btn.disabled = (ROLE !== 'manager'); }
+  } catch (e) {
+    statusEl.className = 'err'; statusEl.textContent = 'Bağlantı hatası'; btn.disabled = false;
+  }
+}
+
+async function load(){
+  statusEl.className = ''; statusEl.textContent = 'Yükleniyor…';
+  try {
+    var r = await fetch('/api/packets', { headers: { authorization: 'Bearer ' + TOKEN } });
+    var j = await r.json();
+    if (!(j && j.ok)) { statusEl.className='err'; statusEl.textContent = (j && j.message) || 'Veri alınamadı'; return; }
+    ROLE = j.role || 'staff';
+    roleEl.textContent = ROLE; roleEl.className = 'role ' + ROLE;
+    statusEl.textContent = '';
+    render(Array.isArray(j.packets) ? j.packets : []);
+  } catch (e) {
+    statusEl.className='err'; statusEl.textContent = 'Bağlantı hatası';
+  }
+}
+
+(async function init(){
+  var t = await call('getSessionToken');
+  TOKEN = t && t.data && t.data.token;
+  if (!TOKEN) { statusEl.className = 'err'; statusEl.textContent = 'Oturum alınamadı (panel dışında mı?)'; return; }
+  load();
+})();
+</script>
+</body>
+</html>
