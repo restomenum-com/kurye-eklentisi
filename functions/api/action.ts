@@ -27,18 +27,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {
-    // DEBUG: gelen hook isteğini CANLI görmek için kurye URL'ine olduğu gibi yönlendir (best-effort, gate'i bloklamaz).
-    const dbgCfg = await getConfig(env, envlp.tenantId);
-    if (dbgCfg?.courierUrl) {
-      try {
-        await fetch(dbgCfg.courierUrl, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-restomenum-plugin': 'kurye', 'x-restomenum-event': 'hook.received', 'x-restomenum-server-id': String(envlp.tenantId || '') },
-          body: JSON.stringify(envlp),
-          signal: AbortSignal.timeout(5000),
-        });
-      } catch { /* debug forward — sessiz geç */ }
-    }
+    // NOT: Hook (before-gate) çağrısını kurye URL'ine FORWARD ETMİYORUZ. Aksi halde deny edilen / masa
+    // kapanmayan denemelerde bile webhook'a "table.close" düşer ve gerçek `table.closed` event'iyle karışır.
+    // Kurye yalnız gerçek async event'lerde (/api/webhook → courierUrl) ve onaylı gönderimde tetiklenmeli.
     if (envlp.event === 'table.close') {
       // Demo gate: form'da "kurye çağrıldı" onayı yoksa masa kapatmayı ENGELLE.
       const courierCalled = envlp.formData?.courierCalled === true;
