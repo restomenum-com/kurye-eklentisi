@@ -33,29 +33,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {
-    // NOT: Hook (before-gate) çağrısını kurye URL'ine FORWARD ETMİYORUZ. Aksi halde deny edilen / masa
-    // kapanmayan denemelerde bile webhook'a "table.close" düşer ve gerçek `table.closed` event'iyle karışır.
-    // Kurye yalnız gerçek async event'lerde (/api/webhook → courierUrl) ve onaylı gönderimde tetiklenmeli.
-    if (envlp.event === 'table.close') {
-      // Demo gate: form'da "kurye çağrıldı" onayı yoksa masa kapatmayı ENGELLE.
-      const courierCalled = envlp.formData?.courierCalled === true;
-      if (!courierCalled) {
-        return Response.json({ decision: 'deny', message: 'Önce kuryeyi çağırın — masa kapatılamaz.' });
-      }
-      return Response.json({ decision: 'allow', message: 'Kurye teyit edildi, masa kapatılabilir.', attach: { note: 'kurye-ok' } });
-    }
-    // packet.status.update + packet.close gate (TEST): her biri AYRI toggle'a bağlı (statusGate / closeGate),
-    // iframe'lerden ayarlanır. Yalnız bu eklentinin oluşturduğu paketlerde çağrılır. Mirror'a da düşer.
-    if (envlp.event === 'packet.status.update' || envlp.event === 'packet.close') {
-      const cfg = await getConfig(env, envlp.tenantId);
-      const gate = envlp.event === 'packet.close' ? cfg?.closeGate : cfg?.statusGate;
-      // TEST: varsayılan DENY — yalnız iframe'den açıkça 'allow' seçilirse izin verilir.
-      if (gate?.mode !== 'allow') {
-        return Response.json({ decision: 'deny', message: gate?.message || 'Test: bu işleme izin verilmedi (kurye gate — deny).' });
-      }
+    // TEST: TÜM hook'lar DENY. İstisna: packet.status.update / packet.close için iframe'den ('statusGate'/
+    // 'closeGate') açıkça 'allow' seçilmişse izin verilir. Diğer tüm hook'lar (table.close, bilinmeyen) → deny.
+    const cfg = await getConfig(env, envlp.tenantId);
+    const gate = envlp.event === 'packet.close' ? cfg?.closeGate
+      : envlp.event === 'packet.status.update' ? cfg?.statusGate
+      : undefined;
+    if (gate?.mode === 'allow') {
       return Response.json({ decision: 'allow', message: 'Test: izin verildi (kurye gate).' });
     }
-    return Response.json({ decision: 'allow', message: 'Bilinmeyen hook — geçildi.' });
+    return Response.json({ decision: 'deny', message: gate?.message || 'Test: tüm hook\'lar reddedildi (kurye gate — deny).' });
   }
 
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.
