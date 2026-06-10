@@ -36,8 +36,8 @@
 <body>
   <div class="card">
     <div class="head">
-      <h1>🧪 Paket Statü Gate Testi</h1>
-      <p><code>packet.status.update</code> — restoran statü değiştirmeden önce eklentiye sorulan allow/deny gate'i</p>
+      <h1>🧪 Paket Gate Testi</h1>
+      <p><code>packet.status.update</code> + <code>packet.close</code> — restoran statü değiştirmeden / paketi kapatmadan önce eklentiye sorulan allow/deny gate'i</p>
     </div>
     <div class="body">
 
@@ -50,7 +50,7 @@
 
       <div class="sec">
         <h2>2 · Gate kararı</h2>
-        <div class="step"><span>②</span><span>Panelde paketin statüsünü değiştirmeyi denediğinde eklenti bu kararı döner:</span></div>
+        <div class="step"><span>②</span><span>Panelde paketin statüsünü değiştirmeyi / paketi kapatmayı denediğinde eklenti bu kararı döner (her ikisi de bu toggle'a bağlı):</span></div>
         <div class="seg">
           <button id="allowBtn">✅ Allow (izin ver)</button>
           <button id="denyBtn">⛔ Deny (engelle)</button>
@@ -61,7 +61,7 @@
 
       <div class="sec">
         <h2>3 · Panelde dene</h2>
-        <div class="step"><span>③</span><span><b>Deny</b> seçiliyken panelde paketin statüsünü değiştir → statü <b>değişmez</b>, mesaj görünür. <b>Allow</b>'da normal geçer. (İmza/akış mirror'a da düşer.)</span></div>
+        <div class="step"><span>③</span><span><b>Deny</b> seçiliyken panelde statü değiştir veya paketi kapat → işlem <b>gerçekleşmez</b>, mesaj görünür. <b>Allow</b>'da normal geçer. (Gate isteği mirror'a da düşer: <code>packet.status.update</code> / <code>packet.close</code>.)</span></div>
       </div>
 
     </div>
