@@ -42,15 +42,8 @@
     <div class="body">
 
       <div class="sec">
-        <h2>1 · Test paketi oluştur</h2>
-        <div class="step"><span>①</span><span>Eklenti-sahipli bir paket oluşturur (<code>callbackUrl</code> damgası → gate açılır). Panelde görünür.</span></div>
-        <button id="createBtn" class="btn-brand" disabled>Test paketi oluştur</button>
-        <div id="createMsg" class="msg"></div>
-      </div>
-
-      <div class="sec">
-        <h2>2 · Gate kararı</h2>
-        <div class="step"><span>②</span><span>Panelde paketin statüsünü değiştirmeyi denediğinde eklenti bu kararı döner:</span></div>
+        <h2>Gate kararı</h2>
+        <div class="step"><span>①</span><span>Panelde paketin statüsünü değiştirmeyi denediğinde eklenti bu kararı döner:</span></div>
         <div class="seg">
           <button id="allowBtn">✅ Allow (izin ver)</button>
           <button id="denyBtn">⛔ Deny (engelle)</button>
@@ -60,8 +53,8 @@
       </div>
 
       <div class="sec">
-        <h2>3 · Panelde dene</h2>
-        <div class="step"><span>③</span><span><b>Deny</b> seçiliyken panelde statü değiştir → statü <b>değişmez</b>, mesaj görünür. <b>Allow</b>'da normal geçer. (Gate isteği mirror'a da düşer: <code>packet.status.update</code>.)</span></div>
+        <h2>Panelde dene</h2>
+        <div class="step"><span>②</span><span><b>Deny</b> seçiliyken panelde statü değiştir → statü <b>değişmez</b>, mesaj görünür. <b>Allow</b>'da normal geçer. (Gate isteği mirror'a da düşer: <code>packet.status.update</code>.)</span></div>
       </div>
 
     </div>
@@ -77,7 +70,6 @@ function call(action,params){return new Promise(function(resolve){var id=Date.no
   setTimeout(function(){if(pending[id]){delete pending[id];resolve({success:false,message:'timeout'});}},15000);});}
 
 var TOKEN='';
-var createBtn=document.getElementById('createBtn'), createMsg=document.getElementById('createMsg');
 var allowBtn=document.getElementById('allowBtn'), denyBtn=document.getElementById('denyBtn');
 var denyMsg=document.getElementById('denyMsg'), modeMsg=document.getElementById('modeMsg');
 
@@ -96,20 +88,10 @@ async function saveMode(mode){
 allowBtn.onclick=function(){saveMode('allow')};
 denyBtn.onclick=function(){saveMode('deny')};
 
-createBtn.onclick=async function(){
-  createMsg.className='msg'; createMsg.textContent='Oluşturuluyor…'; createBtn.disabled=true;
-  var r=await fetch('/api/status-test',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+TOKEN},
-    body:JSON.stringify({createPacket:true})});
-  var j=await r.json();
-  if(j&&j.ok){createMsg.className='msg ok';createMsg.textContent='✓ Paket oluşturuldu: '+j.packetId+' — panelde aç, statüsünü değiştirmeyi dene.';}
-  else{createMsg.className='msg err';createMsg.textContent='Hata: '+((j&&(j.message||j.error))||'bilinmiyor');}
-  createBtn.disabled=false;
-};
-
 (async function init(){
   var t=await call('getSessionToken'); var jwt=t&&t.data&&t.data.token;
   if(!jwt){modeMsg.className='msg err';modeMsg.textContent='Oturum alınamadı (panel dışında mı açıldı?)';return;}
-  TOKEN=jwt; createBtn.disabled=false;
+  TOKEN=jwt;
   var r=await fetch('/api/status-test',{headers:{authorization:'Bearer '+jwt}});
   var j=await r.json(); if(j&&j.ok){paintMode(j.mode);denyMsg.value=j.message||'';}
 })();
