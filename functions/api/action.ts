@@ -33,14 +33,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {
-    // packet.* + table.close hepsi SUNUCU-İÇİ/PANEL gate (formData yok) → karar config toggle'dan (iframe'den
-    // ayarlanır). Varsayılan DENY; ilgili gate 'allow' ise izin. table.close→tableCloseGate ·
-    // packet.status.update→statusGate · packet.close→closeGate · bilinmeyen→deny.
     const cfg = await getConfig(env, envlp.tenantId);
-    const gate = envlp.event === 'table.close' ? cfg?.tableCloseGate
-      : envlp.event === 'packet.status.update' ? cfg?.statusGate
-      : envlp.event === 'packet.close' ? cfg?.closeGate
-      : undefined;
+    // packet.* gate'leri SUNUCU-İÇİ (packetGate; panel iframe yok) → VARSAYILAN ALLOW. Kullanıcı eklenti AYAR
+    // sayfasından 'deny' seçerse engeller. (Restoran akışı varsayılan olarak bloklanmaz.)
+    if (envlp.event === 'packet.close') {
+      // formData.decision (panel iframe varsa) öncelikli; yoksa closeGate config; o da yoksa allow.
+      const mode = envlp.formData?.decision || cfg?.closeGate?.mode;
+      return mode === 'deny'
+        ? Response.json({ decision: 'deny', message: cfg?.closeGate?.message || 'Paket kapatma reddedildi (kurye gate).' })
+        : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
+    }
+    if (envlp.event === 'packet.status.update') {
+      return cfg?.statusGate?.mode === 'deny'
+        ? Response.json({ decision: 'deny', message: cfg?.statusGate?.message || 'Statü değişimi reddedildi (kurye gate).' })
+        : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
+    }
+    // table.close: config toggle (varsayılan DENY — gate'in amacı engelleme; istenirse ayardan allow).
+    const gate = envlp.event === 'table.close' ? cfg?.tableCloseGate : undefined;
     if (gate?.mode === 'allow') {
       return Response.json({ decision: 'allow', message: 'Test: izin verildi (kurye gate).' });
     }
