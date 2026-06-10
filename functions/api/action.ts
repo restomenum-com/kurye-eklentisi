@@ -4,7 +4,7 @@
 //   - Biz işi yapıp **JSON `{success,message}`** döneriz (kullanıcıya toast). Retry yok, idempotency yok.
 // İmza şeması webhook ile aynı (install webhookSecret) → verifySignature ortak.
 import { verifySignature } from '../../lib/sig';
-import { getInstall, getConfig, type Env } from '../../lib/kv';
+import { getInstall, getConfig, getGateApproval, type Env } from '../../lib/kv';
 import { fetchPacket } from '../../lib/restomenum';
 import { mapEventPayload } from '../../lib/mapPayload';
 import { mirrorIncoming } from '../../lib/mirror';
@@ -33,31 +33,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {
+    // DESEN B: kararı kendi state'imizden veririz. Öncelik: iframe'in (/embed/gate) yazdığı per-refId onay
+    // (gate-approval) → yoksa eklenti AYAR sayfası config toggle (server-inline gate'ler için) → ikisi de
+    // yoksa VARSAYILAN ALLOW (restoran akışını bloklama). Panel/sunucu-içi nereden çağrılırsa tutarlı.
+    const refId = envlp.target && envlp.target.id;
     const cfg = await getConfig(env, envlp.tenantId);
-    // packet.* gate'leri SUNUCU-İÇİ (packetGate; panel iframe yok) → VARSAYILAN ALLOW. Kullanıcı eklenti AYAR
-    // sayfasından 'deny' seçerse engeller. (Restoran akışı varsayılan olarak bloklanmaz.)
-    if (envlp.event === 'packet.close') {
-      // formData.decision (panel iframe varsa) öncelikli; yoksa closeGate config; o da yoksa allow.
-      const mode = envlp.formData?.decision || cfg?.closeGate?.mode;
-      return mode === 'deny'
-        ? Response.json({ decision: 'deny', message: cfg?.closeGate?.message || 'Paket kapatma reddedildi (kurye gate).' })
-        : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
-    }
-    if (envlp.event === 'packet.status.update') {
-      return cfg?.statusGate?.mode === 'deny'
-        ? Response.json({ decision: 'deny', message: cfg?.statusGate?.message || 'Statü değişimi reddedildi (kurye gate).' })
-        : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
-    }
-    // table.close: PANEL gate (iframe resolve(formData) gönderir) → karar formData.decision; yoksa tableCloseGate
-    // config; o da yoksa VARSAYILAN ALLOW. (Gate iframe'i /embed/table-close resolve/close çağırır.)
-    if (envlp.event === 'table.close') {
-      const mode = envlp.formData?.decision || cfg?.tableCloseGate?.mode;
-      return mode === 'deny'
-        ? Response.json({ decision: 'deny', message: cfg?.tableCloseGate?.message || 'Masa kapatma reddedildi (kurye gate).' })
-        : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
-    }
-    // bilinmeyen hook → varsayılan ALLOW (restoran akışını bloklama).
-    return Response.json({ decision: 'allow', message: 'İzin verildi (bilinmeyen hook).' });
+    let state = null;
+    if (refId) { try { state = await getGateApproval(env, envlp.tenantId, String(refId)); } catch { /* yoksa allow */ } }
+    const cfgMode = envlp.event === 'table.close' ? cfg?.tableCloseGate?.mode
+      : envlp.event === 'packet.close' ? cfg?.closeGate?.mode
+      : envlp.event === 'packet.status.update' ? cfg?.statusGate?.mode
+      : undefined;
+    const decision = state?.decision || cfgMode; // ikisi de yoksa undefined → allow
+    return decision === 'deny'
+      ? Response.json({ decision: 'deny', message: state?.message || 'İşlem reddedildi (kurye gate).' })
+      : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
   }
 
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.

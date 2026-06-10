@@ -33,6 +33,14 @@ export const getInstall = (env: Env, serverId: string) => env.KV.get<Install>(`i
 export const saveInstall = (env: Env, serverId: string, i: Install) => env.KV.put(`install:${serverId}`, JSON.stringify(i));
 
 export const getConfig = (env: Env, serverId: string) => env.KV.get<Config>(`config:${serverId}`, 'json');
+
+// Desen B — gate onay state'i (iframe yazar, webhook okur). Anahtar tenant+refId; KISA TTL (alakasız geç kapanış
+// allow almasın). decision: iframe'de seçilen karar; webhook bunu okuyup allow/deny verir.
+export type GateApproval = { decision: 'allow' | 'deny'; message?: string; by?: string; at: number };
+export const setGateApproval = (env: Env, serverId: string, refId: string, a: GateApproval, ttlSec = 600) =>
+  env.KV.put(`gate:${serverId}:${refId}`, JSON.stringify(a), { expirationTtl: ttlSec });
+export const getGateApproval = (env: Env, serverId: string, refId: string) =>
+  env.KV.get<GateApproval>(`gate:${serverId}:${refId}`, 'json');
 export const saveConfig = (env: Env, serverId: string, c: Config) => env.KV.put(`config:${serverId}`, JSON.stringify(c));
 
 // Idempotency: BAŞARIYLA işlenince işaretle (forward başarısız olursa retry tekrar denesin).

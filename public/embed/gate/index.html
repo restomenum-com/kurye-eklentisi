@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!-- GENERIC gate iframe — DESEN B. Panel bir gate hook'unda (table.close / packet.close … manifest hook.ui bu
+     sayfaya işaret eder) bunu AÇAR ve bekler. Akış:
+       getContext(refId) → kullanıcı İzin/Reddet → getSessionToken → KENDİ backend'imize POST /api/gate-approval
+       (kararı tenant+refId state'ine yazar) → resolve() (sadece "bitti" sinyali). Vazgeç → close() (iptal).
+     Webhook (action.ts) bu state'i okuyup allow/deny verir → panel/sunucu-içi fark etmez, formData'ya bağımlı değil. -->
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Onay</title>
+<style>
+  :root{--bg:#fff;--ink:#18181b;--muted:#71717a;--line:#e4e4e7;--ok:#16a34a;--err:#dc2626;--mut:#f4f4f5}
+  *{box-sizing:border-box} body{margin:0;padding:18px;background:var(--bg);color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  h1{font-size:16px;margin:0 0 4px} p{font-size:13px;color:var(--muted);margin:0 0 16px}
+  .pid{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--mut);padding:2px 7px;border-radius:6px}
+  .btns{display:flex;flex-direction:column;gap:10px}
+  button{padding:13px 16px;border:0;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;width:100%}
+  .allow{background:var(--ok);color:#fff} .deny{background:var(--err);color:#fff} .cancel{background:var(--mut);color:var(--ink)}
+  button:disabled{opacity:.5;cursor:default}
+  .hint{font-size:12px;color:var(--muted);margin-top:14px} #busy{font-size:13px;color:var(--muted);margin-top:12px;min-height:16px}
+</style>
+</head>
+<body>
+  <h1>🔐 Onay gerekiyor</h1>
+  <p>Kayıt: <span class="pid" id="pid">…</span></p>
+  <div class="btns">
+    <button class="allow"  id="allowBtn" disabled>✅ İzin ver — devam et</button>
+    <button class="deny"   id="denyBtn"  disabled>⛔ Reddet — engelle</button>
+    <button class="cancel" id="cancelBtn" disabled>Vazgeç</button>
+  </div>
+  <div id="busy"></div>
+  <div class="hint">Karar kendi sunucumuza yazılır; webhook onu okuyup uygular (Desen B).</div>
+
+<script>
+function bridgeCall(action, params){
+  return new Promise(function(res){
+    var requestId = Date.now()+'-'+Math.random().toString(36).slice(2);
+    function onMsg(e){ var d=e.data;
+      if(!d || d.type!=='restomenum-bridge-response' || d.requestId!==requestId) return;
+      window.removeEventListener('message', onMsg); res(d.result); }
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({type:'restomenum-bridge', requestId:requestId, action:action, params:params||{}}, '*');
+    setTimeout(function(){ window.removeEventListener('message', onMsg); res({success:false,message:'timeout'}); }, 15000);
+  });
+}
+// bridgeCall sonucu hem düz hem {data:{}} zarfı olabilir → ikisini de aç.
+function unwrap(r, k){ return r && (r[k] !== undefined ? r[k] : (r.data && r.data[k])); }
+
+var allowBtn=document.getElementById('allowBtn'), denyBtn=document.getElementById('denyBtn'),
+    cancelBtn=document.getElementById('cancelBtn'), busy=document.getElementById('busy'), pid=document.getElementById('pid');
+var REFID='', TOKEN='';
+function lock(t){ allowBtn.disabled=denyBtn.disabled=cancelBtn.disabled=true; busy.textContent=t||''; }
+
+async function decide(decision){
+  lock(decision==='allow'?'İşleniyor… (izin)':'İşleniyor… (reddet)');
+  // Kararı KENDİ backend'imize yaz (Bearer session token) — webhook bunu okuyacak.
+  if (TOKEN && REFID) {
+    try {
+      await fetch('/api/gate-approval', {
+        method:'POST',
+        headers:{'content-type':'application/json', authorization:'Bearer '+TOKEN},
+        body: JSON.stringify({ refId: REFID, decision: decision })
+      });
+    } catch (e) { /* yazılamazsa webhook default allow'a düşer */ }
+  }
+  bridgeCall('resolve', {});   // sadece "kullanıcı etkileşimi bitti" sinyali — veri taşımıyor
+}
+allowBtn.onclick  = function(){ decide('allow'); };
+denyBtn.onclick   = function(){ decide('deny'); };
+cancelBtn.onclick = function(){ lock('İptal ediliyor…'); bridgeCall('close'); };
+
+(async function init(){
+  var ctx = await bridgeCall('getContext');     // → { serverId, pluginId, locale, refId }
+  REFID = unwrap(ctx, 'refId') || '';
+  pid.textContent = REFID || '(bilinmiyor)';
+  var t = await bridgeCall('getSessionToken');   // → { token, ... }
+  TOKEN = unwrap(t, 'token') || '';
+  allowBtn.disabled=denyBtn.disabled=cancelBtn.disabled=false;
+})();
+</script>
+</body>
+</html>
