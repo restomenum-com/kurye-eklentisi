@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!-- packet.close — IFRAME gate UI (Desen B). Manifest: hooks[packet.close].ui.url = /embed/hooks/packet-close -->
+<html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paket Kapatma Onayı</title>
+<style>
+  :root{--ink:#18181b;--muted:#71717a;--mut:#f4f4f5;--ok:#16a34a;--err:#dc2626}
+  *{box-sizing:border-box}body{margin:0;padding:18px;color:var(--ink);font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  h1{font-size:16px;margin:0 0 4px}p{font-size:13px;color:var(--muted);margin:0 0 16px}
+  .pid{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--mut);padding:2px 7px;border-radius:6px}
+  .btns{display:flex;flex-direction:column;gap:10px}
+  button{padding:13px 16px;border:0;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;width:100%}
+  .allow{background:var(--ok);color:#fff}.deny{background:var(--err);color:#fff}.cancel{background:var(--mut);color:var(--ink)}
+  button:disabled{opacity:.5}#busy{font-size:13px;color:var(--muted);margin-top:12px;min-height:16px}
+</style></head><body>
+  <h1>📦 Paket kapatma onayı</h1>
+  <p>Paket: <span class="pid" id="pid">…</span> · <code>packet.close</code></p>
+  <div class="btns">
+    <button class="allow" id="a" disabled>✅ İzin ver — paketi kapat</button>
+    <button class="deny" id="d" disabled>⛔ Reddet — engelle</button>
+    <button class="cancel" id="c" disabled>Vazgeç</button>
+  </div><div id="busy"></div>
+<script src="/embed/hooks/gate-client.js"></script>
+</body></html>

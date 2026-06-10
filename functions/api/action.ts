@@ -4,10 +4,21 @@
 //   - Biz işi yapıp **JSON `{success,message}`** döneriz (kullanıcıya toast). Retry yok, idempotency yok.
 // İmza şeması webhook ile aynı (install webhookSecret) → verifySignature ortak.
 import { verifySignature } from '../../lib/sig';
-import { getInstall, getConfig, getGateApproval, type Env } from '../../lib/kv';
+import { getInstall, getConfig, type Env } from '../../lib/kv';
 import { fetchPacket } from '../../lib/restomenum';
 import { mapEventPayload } from '../../lib/mapPayload';
 import { mirrorIncoming } from '../../lib/mirror';
+// Her gate hook kendi klasöründe (lib/hooks/<hook>): iframe + form + noui modlarını otomatik birleştirir.
+import { decide as decideTableClose } from '../../lib/hooks/table-close';
+import { decide as decidePacketClose } from '../../lib/hooks/packet-close';
+import { decide as decidePacketStatusUpdate } from '../../lib/hooks/packet-status-update';
+import { type Decision } from '../../lib/hooks/shared';
+
+const HOOK_DECIDERS: Record<string, (env: Env, envlp: any) => Promise<Decision>> = {
+  'table.close': decideTableClose,
+  'packet.close': decidePacketClose,
+  'packet.status.update': decidePacketStatusUpdate,
+};
 
 const FORWARD_TIMEOUT_MS = 8000;
 
@@ -32,22 +43,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   if (!sigValid) return Response.json({ success: false, message: 'bad signature' }, { status: 401 });
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
+  // Her hook KENDİ klasöründeki decider'a yönlendirilir (lib/hooks/<hook> → iframe|form|noui modunu otomatik seçer).
   if (envlp.type === 'hook') {
-    // DESEN B: kararı kendi state'imizden veririz. Öncelik: iframe'in (/embed/gate) yazdığı per-refId onay
-    // (gate-approval) → yoksa eklenti AYAR sayfası config toggle (server-inline gate'ler için) → ikisi de
-    // yoksa VARSAYILAN ALLOW (restoran akışını bloklama). Panel/sunucu-içi nereden çağrılırsa tutarlı.
-    const refId = envlp.target && envlp.target.id;
-    const cfg = await getConfig(env, envlp.tenantId);
-    let state = null;
-    if (refId) { try { state = await getGateApproval(env, envlp.tenantId, String(refId)); } catch { /* yoksa allow */ } }
-    const cfgMode = envlp.event === 'table.close' ? cfg?.tableCloseGate?.mode
-      : envlp.event === 'packet.close' ? cfg?.closeGate?.mode
-      : envlp.event === 'packet.status.update' ? cfg?.statusGate?.mode
-      : undefined;
-    const decision = state?.decision || cfgMode; // ikisi de yoksa undefined → allow
-    return decision === 'deny'
-      ? Response.json({ decision: 'deny', message: state?.message || 'İşlem reddedildi (kurye gate).' })
-      : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
+    const decider = HOOK_DECIDERS[envlp.event];
+    const d = decider ? await decider(env, envlp) : { decision: 'allow' as const, message: 'İzin verildi (bilinmeyen hook).' };
+    return Response.json(d);
   }
 
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.
