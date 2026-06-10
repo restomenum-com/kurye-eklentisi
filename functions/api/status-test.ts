@@ -15,7 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!ctx) return Response.json({ error: 'unauthorized' }, { status: 401 });
   const field = gateField(new URL(request.url).searchParams.get('gate'));
   const cfg = await getConfig(env, ctx.serverId);
-  return Response.json({ ok: true, mode: cfg?.[field]?.mode || 'allow', message: cfg?.[field]?.message || '' });
+  return Response.json({ ok: true, mode: cfg?.[field]?.mode || 'deny', message: cfg?.[field]?.message || '' }); // TEST: varsayılan deny (action.ts ile tutarlı)
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {

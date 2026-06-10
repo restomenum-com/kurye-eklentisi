@@ -49,8 +49,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     if (envlp.event === 'packet.status.update' || envlp.event === 'packet.close') {
       const cfg = await getConfig(env, envlp.tenantId);
       const gate = envlp.event === 'packet.close' ? cfg?.closeGate : cfg?.statusGate;
-      if (gate?.mode === 'deny') {
-        return Response.json({ decision: 'deny', message: gate.message || 'Test: bu işleme izin verilmedi (kurye gate).' });
+      // TEST: varsayılan DENY — yalnız iframe'den açıkça 'allow' seçilirse izin verilir.
+      if (gate?.mode !== 'allow') {
+        return Response.json({ decision: 'deny', message: gate?.message || 'Test: bu işleme izin verilmedi (kurye gate — deny).' });
       }
       return Response.json({ decision: 'allow', message: 'Test: izin verildi (kurye gate).' });
     }
