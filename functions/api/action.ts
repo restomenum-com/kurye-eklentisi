@@ -44,12 +44,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
       }
       return Response.json({ decision: 'allow', message: 'Kurye teyit edildi, masa kapatılabilir.', attach: { note: 'kurye-ok' } });
     }
-    // packet.status.update + packet.close gate (TEST): iframe'den ayarlanan moda göre allow/deny. Yalnız bu
-    // eklentinin oluşturduğu paketlerde (pluginStatusCallback eşleşmesi backend'de) çağrılır. Mirror'a da düşer.
+    // packet.status.update + packet.close gate (TEST): her biri AYRI toggle'a bağlı (statusGate / closeGate),
+    // iframe'lerden ayarlanır. Yalnız bu eklentinin oluşturduğu paketlerde çağrılır. Mirror'a da düşer.
     if (envlp.event === 'packet.status.update' || envlp.event === 'packet.close') {
       const cfg = await getConfig(env, envlp.tenantId);
-      if (cfg?.statusGate?.mode === 'deny') {
-        return Response.json({ decision: 'deny', message: cfg.statusGate.message || 'Test: bu işleme izin verilmedi (kurye gate).' });
+      const gate = envlp.event === 'packet.close' ? cfg?.closeGate : cfg?.statusGate;
+      if (gate?.mode === 'deny') {
+        return Response.json({ decision: 'deny', message: gate.message || 'Test: bu işleme izin verilmedi (kurye gate).' });
       }
       return Response.json({ decision: 'allow', message: 'Test: izin verildi (kurye gate).' });
     }

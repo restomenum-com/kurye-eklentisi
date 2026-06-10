@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<!-- iframe TEST sayfası — packet.status.update gate'ini denemek için.
+<!-- iframe TEST sayfası — packet.close gate'ini denemek için (status-test'in close eşi; ayrı toggle = closeGate).
      1) "Test paketi oluştur" → orders:write ile eklenti-sahipli paket (callbackUrl damgası → gate açılır).
-     2) Gate modu: Allow / Deny (+mesaj) → action.ts bunu okuyup statü geçişlerinde allow/deny döner.
-     Sonra panelde paketin statüsünü değiştirip sonucu gör. App Bridge inline; build YOK. -->
+     2) Gate modu: Allow / Deny (+mesaj) → action.ts paket KAPATMA denemesinde allow/deny döner.
+     App Bridge inline; build YOK. Backend: /api/status-test (gate='close' → closeGate). -->
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Paket Statü Gate Testi</title>
+<title>Paket Kapatma Gate Testi</title>
 <style>
   :root { --bg:#f4f5f7; --card:#fff; --ink:#18181b; --muted:#71717a; --line:#e4e4e7; --brand:#f6821f;
-    --ok:#16a34a; --err:#dc2626; --warn:#d97706; }
+    --ok:#16a34a; --err:#dc2626; }
   *{box-sizing:border-box} body{margin:0;padding:24px 16px;background:var(--bg);color:var(--ink);
     font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
   .card{max-width:600px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;
@@ -28,7 +28,6 @@
   .seg button.active-allow{background:var(--ok);color:#fff} .seg button.active-deny{background:var(--err);color:#fff}
   input[type=text]{width:100%;padding:11px 12px;border:1px solid #d4d4d8;border-radius:10px;font-size:14px;margin-top:10px}
   input:focus{outline:none;border-color:var(--brand)}
-  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#f1f1f4}
   .msg{font-size:13px;margin-top:10px;min-height:18px} .msg.ok{color:var(--ok)} .msg.err{color:var(--err)}
   code{background:#f1f1f4;padding:1px 6px;border-radius:5px;font-size:12px;font-family:ui-monospace,Menlo,monospace}
 </style>
@@ -36,8 +35,8 @@
 <body>
   <div class="card">
     <div class="head">
-      <h1>🧪 Statü Gate Testi</h1>
-      <p><code>packet.status.update</code> — restoran statü değiştirmeden önce eklentiye sorulan allow/deny gate'i (packet.close ayrı sayfada)</p>
+      <h1>🧪 Paket Kapatma Gate Testi</h1>
+      <p><code>packet.close</code> — restoran paketi kapatmadan önce eklentiye sorulan allow/deny gate'i (statü gate'i ayrı sayfada)</p>
     </div>
     <div class="body">
 
@@ -49,8 +48,8 @@
       </div>
 
       <div class="sec">
-        <h2>2 · Gate kararı</h2>
-        <div class="step"><span>②</span><span>Panelde paketin statüsünü değiştirmeyi denediğinde eklenti bu kararı döner:</span></div>
+        <h2>2 · Kapatma kararı</h2>
+        <div class="step"><span>②</span><span>Panelde paketi <b>kapatmayı</b> denediğinde eklenti bu kararı döner (yalnız <code>packet.close</code>; statü gate'inden bağımsız):</span></div>
         <div class="seg">
           <button id="allowBtn">✅ Allow (izin ver)</button>
           <button id="denyBtn">⛔ Deny (engelle)</button>
@@ -61,7 +60,7 @@
 
       <div class="sec">
         <h2>3 · Panelde dene</h2>
-        <div class="step"><span>③</span><span><b>Deny</b> seçiliyken panelde statü değiştir → statü <b>değişmez</b>, mesaj görünür. <b>Allow</b>'da normal geçer. (Gate isteği mirror'a da düşer: <code>packet.status.update</code>.)</span></div>
+        <div class="step"><span>③</span><span><b>Deny</b> seçiliyken panelde paketi kapat → paket <b>kapanmaz</b>, mesaj görünür. <b>Allow</b>'da normal kapanır. (Gate isteği mirror'a da düşer: <code>packet.close</code>.)</span></div>
       </div>
 
     </div>
@@ -76,7 +75,7 @@ function call(action,params){return new Promise(function(resolve){var id=Date.no
   window.parent.postMessage({type:'restomenum-bridge',requestId:id,action:action,params:params||{}},'*');
   setTimeout(function(){if(pending[id]){delete pending[id];resolve({success:false,message:'timeout'});}},15000);});}
 
-var TOKEN='';
+var TOKEN='', GATE='close';
 var createBtn=document.getElementById('createBtn'), createMsg=document.getElementById('createMsg');
 var allowBtn=document.getElementById('allowBtn'), denyBtn=document.getElementById('denyBtn');
 var denyMsg=document.getElementById('denyMsg'), modeMsg=document.getElementById('modeMsg');
@@ -88,7 +87,7 @@ function paintMode(mode){
 async function saveMode(mode){
   modeMsg.className='msg'; modeMsg.textContent='Kaydediliyor…';
   var r=await fetch('/api/status-test',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+TOKEN},
-    body:JSON.stringify({mode:mode,message:denyMsg.value})});
+    body:JSON.stringify({gate:GATE,mode:mode,message:denyMsg.value})});
   var j=await r.json();
   if(j&&j.ok){paintMode(j.mode);modeMsg.className='msg ok';modeMsg.textContent='✓ Kaydedildi: '+(j.mode==='deny'?'DENY (engelle)':'ALLOW (izin ver)');}
   else{modeMsg.className='msg err';modeMsg.textContent='Hata: '+((j&&(j.message||j.error))||'bilinmiyor');}
@@ -101,7 +100,7 @@ createBtn.onclick=async function(){
   var r=await fetch('/api/status-test',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+TOKEN},
     body:JSON.stringify({createPacket:true})});
   var j=await r.json();
-  if(j&&j.ok){createMsg.className='msg ok';createMsg.textContent='✓ Paket oluşturuldu: '+j.packetId+' — panelde aç, statüsünü değiştirmeyi dene.';}
+  if(j&&j.ok){createMsg.className='msg ok';createMsg.textContent='✓ Paket oluşturuldu: '+j.packetId+' — panelde aç, kapatmayı dene.';}
   else{createMsg.className='msg err';createMsg.textContent='Hata: '+((j&&(j.message||j.error))||'bilinmiyor');}
   createBtn.disabled=false;
 };
@@ -110,7 +109,7 @@ createBtn.onclick=async function(){
   var t=await call('getSessionToken'); var jwt=t&&t.data&&t.data.token;
   if(!jwt){modeMsg.className='msg err';modeMsg.textContent='Oturum alınamadı (panel dışında mı açıldı?)';return;}
   TOKEN=jwt; createBtn.disabled=false;
-  var r=await fetch('/api/status-test',{headers:{authorization:'Bearer '+jwt}});
+  var r=await fetch('/api/status-test?gate='+GATE,{headers:{authorization:'Bearer '+jwt}});
   var j=await r.json(); if(j&&j.ok){paintMode(j.mode);denyMsg.value=j.message||'';}
 })();
 </script>

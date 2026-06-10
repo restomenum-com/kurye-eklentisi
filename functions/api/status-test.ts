@@ -7,11 +7,15 @@ import { verifySessionToken } from '../../lib/jwt';
 import { getInstall, getConfig, saveConfig, type Env } from '../../lib/kv';
 import { fetchFirstProductId, createTestPacket } from '../../lib/restomenum';
 
+// gate paramı: 'close' → closeGate (packet.close); aksi → statusGate (packet.status.update).
+const gateField = (g: string | null | undefined) => (g === 'close' ? 'closeGate' : 'statusGate') as 'closeGate' | 'statusGate';
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const ctx = await verifySessionToken(request.headers.get('authorization'), env);
   if (!ctx) return Response.json({ error: 'unauthorized' }, { status: 401 });
+  const field = gateField(new URL(request.url).searchParams.get('gate'));
   const cfg = await getConfig(env, ctx.serverId);
-  return Response.json({ ok: true, mode: cfg?.statusGate?.mode || 'allow', message: cfg?.statusGate?.message || '' });
+  return Response.json({ ok: true, mode: cfg?.[field]?.mode || 'allow', message: cfg?.[field]?.message || '' });
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -32,10 +36,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({ ok: true, packetId: r.packetId });
   }
 
-  // (b) Gate modunu kaydet (allow/deny + mesaj). Config'i MERGE et (courierUrl/mirrorUrl korunur).
+  // (b) Gate modunu kaydet (allow/deny + mesaj). gate paramı hangi field'a yazılacağını seçer. MERGE.
+  const field = gateField(body?.gate);
   const mode = body?.mode === 'deny' ? 'deny' : 'allow';
   const message = String(body?.message || '').slice(0, 300);
   const cfg = (await getConfig(env, ctx.serverId)) || ({ courierUrl: '', updatedAt: 0 } as any);
-  await saveConfig(env, ctx.serverId, { ...cfg, statusGate: { mode, message: message || undefined }, updatedAt: Date.now() });
+  await saveConfig(env, ctx.serverId, { ...cfg, [field]: { mode, message: message || undefined }, updatedAt: Date.now() });
   return Response.json({ ok: true, mode, message });
 };

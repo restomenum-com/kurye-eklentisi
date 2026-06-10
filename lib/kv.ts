@@ -24,7 +24,9 @@ export type Install = {
 // (webhook.site) yansıtılır; ayırt edici flag ile (lib/mirror.ts). Boş → kapalı. Kurye akışını etkilemez.
 // statusGate: TEST — packet.status.update gate'inin allow/deny davranışını iframe'den kontrol etmek için.
 // mode 'deny' → her statü geçişini reddet (panelde mesaj görünür); 'allow'/yok → izin ver. message: deny metni.
-export type Config = { courierUrl: string; autoForward?: boolean; mirrorUrl?: string; statusGate?: { mode: 'allow' | 'deny'; message?: string }; updatedAt: number };
+// statusGate → packet.status.update; closeGate → packet.close. Ayrı toggle'lar (bağımsız test).
+export type GateConfig = { mode: 'allow' | 'deny'; message?: string };
+export type Config = { courierUrl: string; autoForward?: boolean; mirrorUrl?: string; statusGate?: GateConfig; closeGate?: GateConfig; updatedAt: number };
 
 export const getInstall = (env: Env, serverId: string) => env.KV.get<Install>(`install:${serverId}`, 'json');
 export const saveInstall = (env: Env, serverId: string, i: Install) => env.KV.put(`install:${serverId}`, JSON.stringify(i));
