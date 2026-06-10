@@ -33,17 +33,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
 
   // type:'hook' → before-action blocking gate (§3). {decision:'allow'|'deny', message?, attach?} döneriz.
   if (envlp.type === 'hook') {
-    // packet.close: PANEL gate iframe'i (/embed/packet-close) resolve(formData) ile devam ettirir →
-    // karar burada formData.decision'dan ('allow'/'deny'). Kullanıcı iframe'de İzin Ver/Reddet seçti.
-    if (envlp.event === 'packet.close') {
-      return envlp.formData?.decision === 'allow'
-        ? Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' })
-        : Response.json({ decision: 'deny', message: 'Paket kapatma reddedildi (kurye gate).' });
-    }
-    // table.close / packet.status.update: iframe config toggle (varsayılan DENY; 'allow' ise izin).
+    // packet.* + table.close hepsi SUNUCU-İÇİ/PANEL gate (formData yok) → karar config toggle'dan (iframe'den
+    // ayarlanır). Varsayılan DENY; ilgili gate 'allow' ise izin. table.close→tableCloseGate ·
+    // packet.status.update→statusGate · packet.close→closeGate · bilinmeyen→deny.
     const cfg = await getConfig(env, envlp.tenantId);
     const gate = envlp.event === 'table.close' ? cfg?.tableCloseGate
       : envlp.event === 'packet.status.update' ? cfg?.statusGate
+      : envlp.event === 'packet.close' ? cfg?.closeGate
       : undefined;
     if (gate?.mode === 'allow') {
       return Response.json({ decision: 'allow', message: 'Test: izin verildi (kurye gate).' });
