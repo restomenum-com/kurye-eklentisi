@@ -22,7 +22,9 @@ export type Install = {
 };
 // mirrorUrl: TEST/DEBUG — Restomenum'dan gelen TÜM ham istekler (event/action/hook) ayrıca buraya
 // (webhook.site) yansıtılır; ayırt edici flag ile (lib/mirror.ts). Boş → kapalı. Kurye akışını etkilemez.
-export type Config = { courierUrl: string; autoForward?: boolean; mirrorUrl?: string; updatedAt: number };
+// statusGate: TEST — packet.status.update gate'inin allow/deny davranışını iframe'den kontrol etmek için.
+// mode 'deny' → her statü geçişini reddet (panelde mesaj görünür); 'allow'/yok → izin ver. message: deny metni.
+export type Config = { courierUrl: string; autoForward?: boolean; mirrorUrl?: string; statusGate?: { mode: 'allow' | 'deny'; message?: string }; updatedAt: number };
 
 export const getInstall = (env: Env, serverId: string) => env.KV.get<Install>(`install:${serverId}`, 'json');
 export const saveInstall = (env: Env, serverId: string, i: Install) => env.KV.put(`install:${serverId}`, JSON.stringify(i));

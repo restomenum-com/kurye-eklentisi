@@ -37,6 +37,53 @@ export async function fetchOpenPackets(env: Env, apiKey: string): Promise<any[]>
   }
 }
 
+/**
+ * TEST — ürün kataloğundan ilk aktif ürünü çek (Callback API — `GET /plugin-api/products/list`, products:read).
+ * packets/create test paketi için bir ürün id'si gerekir. Yoksa null.
+ */
+export async function fetchFirstProductId(env: Env, apiKey: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${env.RESTOMENUM_BASE}/plugin-api/products/list`, {
+      headers: { authorization: 'Bearer ' + apiKey, accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j?.success || !Array.isArray(j.data)) return null;
+    const pick = j.data.find((p: any) => p && p.active && p.id) || j.data.find((p: any) => p && p.id);
+    return pick ? String(pick.id) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * TEST — yeni paket sipariş oluştur (Callback API — `POST /plugin-api/packets/create`, orders:write).
+ * `callbackUrl` SAHİPLİK damgasıdır → paketi bu eklenti oluşturmuş sayılır → packet.status.update gate'i açılır.
+ * @returns {Promise<{ok:boolean, packetId?:string, message?:string}>}
+ */
+export async function createTestPacket(env: Env, apiKey: string, productId: string, callbackUrl: string): Promise<{ ok: boolean; packetId?: string; message?: string }> {
+  try {
+    const r = await fetch(`${env.RESTOMENUM_BASE}/plugin-api/packets/create`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        customer: { id: 'test-' + Date.now(), name: 'Gate Test Müşteri', address: 'Test Adres 1' },
+        cart: [{ product: productId, quantity: 1 }],
+        paymentNote: 'test',
+        note: 'packet.status.update gate testi',
+        callbackUrl, // sahiplik damgası — gate'i açar
+        idempotencyKey: 'gatetest-' + Date.now(),
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j?.success) return { ok: false, message: j?.message || ('HTTP ' + r.status) };
+    return { ok: true, packetId: j.data?.packetId };
+  } catch (e: any) {
+    return { ok: false, message: e?.message || 'network' };
+  }
+}
+
 export type ExchangeResult = {
   apiKey: string;
   webhookSecret: string;
