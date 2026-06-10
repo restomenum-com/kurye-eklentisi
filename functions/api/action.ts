@@ -48,12 +48,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
         ? Response.json({ decision: 'deny', message: cfg?.statusGate?.message || 'Statü değişimi reddedildi (kurye gate).' })
         : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
     }
-    // table.close: config toggle (varsayılan DENY — gate'in amacı engelleme; istenirse ayardan allow).
-    const gate = envlp.event === 'table.close' ? cfg?.tableCloseGate : undefined;
-    if (gate?.mode === 'allow') {
-      return Response.json({ decision: 'allow', message: 'Test: izin verildi (kurye gate).' });
+    // table.close: PANEL gate (iframe resolve(formData) gönderir) → karar formData.decision; yoksa tableCloseGate
+    // config; o da yoksa VARSAYILAN ALLOW. (Gate iframe'i /embed/table-close resolve/close çağırır.)
+    if (envlp.event === 'table.close') {
+      const mode = envlp.formData?.decision || cfg?.tableCloseGate?.mode;
+      return mode === 'deny'
+        ? Response.json({ decision: 'deny', message: cfg?.tableCloseGate?.message || 'Masa kapatma reddedildi (kurye gate).' })
+        : Response.json({ decision: 'allow', message: 'İzin verildi (kurye gate).' });
     }
-    return Response.json({ decision: 'deny', message: gate?.message || 'Test: reddedildi (kurye gate — deny).' });
+    // bilinmeyen hook → varsayılan ALLOW (restoran akışını bloklama).
+    return Response.json({ decision: 'allow', message: 'İzin verildi (bilinmeyen hook).' });
   }
 
   // hook → iş. Şimdilik tek hook: paketi manuel kuryeye gönder.
