@@ -45,16 +45,27 @@
         <h2>Gate kararı</h2>
         <div class="step"><span>①</span><span>Panelde paketin statüsünü değiştirmeyi denediğinde eklenti bu kararı döner:</span></div>
         <div class="seg">
-          <button id="allowBtn">✅ Allow (izin ver)</button>
-          <button id="denyBtn">⛔ Deny (engelle)</button>
+          <button id="allowBtn">✅ Allow</button>
+          <button id="denyBtn">⛔ Deny</button>
+          <button id="pendingBtn">⏳ Pending</button>
         </div>
-        <input id="denyMsg" type="text" placeholder="Deny mesajı (panelde gösterilir) — ops" />
+        <input id="denyMsg" type="text" placeholder="Deny/pending mesajı (panelde gösterilir) — ops" />
         <div id="modeMsg" class="msg"></div>
       </div>
 
       <div class="sec">
         <h2>Panelde dene</h2>
-        <div class="step"><span>②</span><span><b>Deny</b> seçiliyken panelde statü değiştir → statü <b>değişmez</b>, mesaj görünür. <b>Allow</b>'da normal geçer. (Gate isteği mirror'a da düşer: <code>packet.status.update</code>.)</span></div>
+        <div class="step"><span>②</span><span><b>Deny</b> → statü değişmez + mesaj. <b>Allow</b> → normal geçer. <b>Pending</b> → statü <b>askıya alınır</b> (eklenti onayı bekleniyor); paket kaydedilir → aşağıdan çöz. (Gate isteği mirror'a düşer.)</span></div>
+      </div>
+
+      <div class="sec">
+        <h2>Bekleyen gate'i çöz (pending → async)</h2>
+        <div class="step"><span>③</span><span><b>Pending</b> ile askıya alınan son paketi burada çöz: <b>Allow</b> → held statü <b>uygulanır</b>; <b>Deny</b> → iptal (statü kalır). (Gerçekte eklenti kurye atayınca otomatik çağırır.)</span></div>
+        <div class="seg">
+          <button id="resolveAllowBtn">✅ Resolve Allow</button>
+          <button id="resolveDenyBtn">⛔ Resolve Deny</button>
+        </div>
+        <div id="resolveMsg" class="msg"></div>
       </div>
 
     </div>
@@ -70,23 +81,38 @@ function call(action,params){return new Promise(function(resolve){var id=Date.no
   setTimeout(function(){if(pending[id]){delete pending[id];resolve({success:false,message:'timeout'});}},15000);});}
 
 var TOKEN='';
-var allowBtn=document.getElementById('allowBtn'), denyBtn=document.getElementById('denyBtn');
+var allowBtn=document.getElementById('allowBtn'), denyBtn=document.getElementById('denyBtn'), pendingBtn=document.getElementById('pendingBtn');
 var denyMsg=document.getElementById('denyMsg'), modeMsg=document.getElementById('modeMsg');
+var resolveAllowBtn=document.getElementById('resolveAllowBtn'), resolveDenyBtn=document.getElementById('resolveDenyBtn'), resolveMsg=document.getElementById('resolveMsg');
 
 function paintMode(mode){
-  allowBtn.className = mode==='allow' ? 'active-allow' : '';
-  denyBtn.className  = mode==='deny'  ? 'active-deny'  : '';
+  allowBtn.className   = mode==='allow'   ? 'active-allow' : '';
+  denyBtn.className    = mode==='deny'    ? 'active-deny'  : '';
+  pendingBtn.className = mode==='pending' ? 'active-deny'  : '';
 }
 async function saveMode(mode){
   modeMsg.className='msg'; modeMsg.textContent='Kaydediliyor…';
   var r=await fetch('/api/status-test',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+TOKEN},
     body:JSON.stringify({mode:mode,message:denyMsg.value})});
   var j=await r.json();
-  if(j&&j.ok){paintMode(j.mode);modeMsg.className='msg ok';modeMsg.textContent='✓ Kaydedildi: '+(j.mode==='deny'?'DENY (engelle)':'ALLOW (izin ver)');}
+  var label={allow:'ALLOW (izin ver)',deny:'DENY (engelle)',pending:'PENDING (askıya al)'}[j&&j.mode]||'';
+  if(j&&j.ok){paintMode(j.mode);modeMsg.className='msg ok';modeMsg.textContent='✓ Kaydedildi: '+label;}
   else{modeMsg.className='msg err';modeMsg.textContent='Hata: '+((j&&(j.message||j.error))||'bilinmiyor');}
 }
 allowBtn.onclick=function(){saveMode('allow')};
 denyBtn.onclick=function(){saveMode('deny')};
+pendingBtn.onclick=function(){saveMode('pending')};
+
+async function resolve(decision){
+  resolveMsg.className='msg'; resolveMsg.textContent='Çözülüyor…';
+  var r=await fetch('/api/gate-resolve-test',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+TOKEN},
+    body:JSON.stringify({decision:decision})});
+  var j=await r.json();
+  if(j&&j.ok){resolveMsg.className='msg ok';resolveMsg.textContent='✓ '+(decision==='allow'?'Allow uygulandı (statü değişti)':'Deny (iptal edildi)')+' — paket '+j.packetId;}
+  else{resolveMsg.className='msg err';resolveMsg.textContent='Hata: '+((j&&(j.message||j.error))||'bilinmiyor');}
+}
+resolveAllowBtn.onclick=function(){resolve('allow')};
+resolveDenyBtn.onclick=function(){resolve('deny')};
 
 (async function init(){
   var t=await call('getSessionToken'); var jwt=t&&t.data&&t.data.token;

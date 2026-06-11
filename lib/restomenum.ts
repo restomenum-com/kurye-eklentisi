@@ -20,6 +20,27 @@ export async function fetchPacket(env: Env, apiKey: string, packetId: string): P
 }
 
 /**
+ * Pending gate'i çöz (Callback API — `POST /plugin-api/packets/gate-resolve`, install apiKey, hooks:packet.status).
+ * packet.status.update'te 'pending' döndükten sonra held geçişi uygular (allow) / iptal eder (deny). `to` opsiyonel
+ * (backend pendingGate.to'yu kullanır). @returns {ok, message?}
+ */
+export async function gateResolve(env: Env, apiKey: string, packetId: string, decision: 'allow' | 'deny'): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const r = await fetch(`${env.RESTOMENUM_BASE}/plugin-api/packets/gate-resolve`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ packetId, decision }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok || !j?.success) return { ok: false, message: (j && j.message) || ('HTTP ' + r.status) };
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, message: e?.message || 'network' };
+  }
+}
+
+/**
  * Mağazanın açık paketlerini çek (Callback API — `GET /plugin-api/packets/open`, install apiKey, orders:read).
  * Özet liste döner (satır/müşteri yok); hata/yetki yoksa boş dizi.
  */

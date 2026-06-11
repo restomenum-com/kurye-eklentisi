@@ -43,6 +43,14 @@ export const setGateApproval = (env: Env, serverId: string, refId: string, a: Ga
   env.KV.put(`gate:${serverId}:${refId}`, JSON.stringify(a), { expirationTtl: ttlSec });
 export const getGateApproval = (env: Env, serverId: string, refId: string) =>
   env.KV.get<GateApproval>(`gate:${serverId}:${refId}`, 'json');
+
+// TEST — packet.status.update gate'i 'pending' döndüğünde son bekleyen paketi kaydet (1sa); ayar sayfası
+// "Bekleyen gate'i çöz" butonu bunu okuyup Restomenum gate-resolve ucunu çağırır (async approve/reject testi).
+export type PendingResolve = { packetId: string; at: number };
+export const setPendingResolve = (env: Env, serverId: string, p: PendingResolve) =>
+  env.KV.put(`pendingresolve:${serverId}`, JSON.stringify(p), { expirationTtl: 3600 });
+export const getPendingResolve = (env: Env, serverId: string) =>
+  env.KV.get<PendingResolve>(`pendingresolve:${serverId}`, 'json');
 export const saveConfig = (env: Env, serverId: string, c: Config) => env.KV.put(`config:${serverId}`, JSON.stringify(c));
 
 // Idempotency: BAŞARIYLA işlenince işaretle (forward başarısız olursa retry tekrar denesin).
