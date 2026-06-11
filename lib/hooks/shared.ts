@@ -5,9 +5,11 @@
 //   noui    → UI yok: karar eklenti AYAR config toggle'ından (default allow).
 import { getGateApproval, getConfig, type Env, type Config } from '../kv';
 
-export type Decision = { decision: 'allow' | 'deny'; message?: string; attach?: Record<string, unknown> };
+// pending: YALNIZ packet.status.update'te anlamlı (backend P1 — statü askıya alınır; eklenti sonra gate-resolve çağırır).
+export type Decision = { decision: 'allow' | 'deny' | 'pending'; message?: string; attach?: Record<string, unknown> };
 export const ALLOW = (message?: string): Decision => ({ decision: 'allow', message });
 export const DENY = (message?: string): Decision => ({ decision: 'deny', message });
+export const PENDING = (message?: string): Decision => ({ decision: 'pending', message });
 
 /** iframe modu (Desen B) — per-refId onay state'i. Yazılmamışsa null (başka mod denenir). */
 export async function fromState(env: Env, envlp: any): Promise<Decision | null> {
@@ -30,5 +32,7 @@ export function fromForm(envlp: any): Decision | null {
 export async function fromConfig(env: Env, serverId: string, field: keyof Config): Promise<Decision> {
   const cfg = await getConfig(env, serverId);
   const g = cfg ? (cfg[field] as { mode?: string; message?: string } | undefined) : undefined;
-  return g?.mode === 'deny' ? DENY(g.message || 'Reddedildi (ayar).') : ALLOW('İzin verildi (UI yok — varsayılan/ayar).');
+  if (g?.mode === 'deny') return DENY(g.message || 'Reddedildi (ayar).');
+  if (g?.mode === 'pending') return PENDING(g.message || 'Kurye atanıyor, onay birazdan (kurye gate — pending).');
+  return ALLOW('İzin verildi (UI yok — varsayılan/ayar).');
 }

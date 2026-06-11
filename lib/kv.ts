@@ -26,7 +26,9 @@ export type Install = {
 // mode 'deny' → her statü geçişini reddet (panelde mesaj görünür); 'allow'/yok → izin ver. message: deny metni.
 // Her hook'un kendi allow/deny toggle'ı (iframe'den ayarlanır): statusGate→packet.status.update,
 // closeGate→packet.close, tableCloseGate→table.close. Hepsi bağımsız.
-export type GateConfig = { mode: 'allow' | 'deny'; message?: string };
+// mode 'pending' YALNIZ packet.status.update'te anlamlı (async approve/reject — backend P1 tanır); diğer
+// hook'larda backend pending'i yok sayar (failMode). TEST: statü geçişini askıya alıp gate-resolve'u beklemek.
+export type GateConfig = { mode: 'allow' | 'deny' | 'pending'; message?: string };
 export type Config = { courierUrl: string; autoForward?: boolean; mirrorUrl?: string; statusGate?: GateConfig; closeGate?: GateConfig; tableCloseGate?: GateConfig; updatedAt: number };
 
 export const getInstall = (env: Env, serverId: string) => env.KV.get<Install>(`install:${serverId}`, 'json');

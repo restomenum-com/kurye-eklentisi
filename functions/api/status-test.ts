@@ -24,9 +24,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!ctx) return Response.json({ error: 'unauthorized' }, { status: 401 });
   const body: any = await request.json().catch(() => ({}));
 
-  // Gate modunu kaydet (allow/deny + mesaj). gate paramı hangi field'a yazılacağını seçer. Config MERGE.
+  // Gate modunu kaydet (allow/deny/pending + mesaj). gate paramı hangi field'a yazılacağını seçer. Config MERGE.
+  // pending YALNIZ status gate'inde (packet.status.update) anlamlı; diğer gate'lerde backend yok sayar.
   const field = gateField(body?.gate);
-  const mode = body?.mode === 'deny' ? 'deny' : 'allow';
+  const mode = (body?.mode === 'deny' || body?.mode === 'pending') ? body.mode : 'allow';
   const message = String(body?.message || '').slice(0, 300);
   const cfg = (await getConfig(env, ctx.serverId)) || ({ courierUrl: '', updatedAt: 0 } as any);
   await saveConfig(env, ctx.serverId, { ...cfg, [field]: { mode, message: message || undefined }, updatedAt: Date.now() });
