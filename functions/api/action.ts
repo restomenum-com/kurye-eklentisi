@@ -4,7 +4,7 @@
 //   - Biz işi yapıp **JSON `{success,message}`** döneriz (kullanıcıya toast). Retry yok, idempotency yok.
 // İmza şeması webhook ile aynı (install webhookSecret) → verifySignature ortak.
 import { verifySignature } from '../../lib/sig';
-import { getInstall, getConfig, setPendingResolve, type Env } from '../../lib/kv';
+import { getInstall, getConfig, type Env } from '../../lib/kv';
 import { fetchPacket } from '../../lib/restomenum';
 import { mapEventPayload } from '../../lib/mapPayload';
 import { mirrorIncoming } from '../../lib/mirror';
@@ -47,10 +47,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   if (envlp.type === 'hook') {
     const decider = HOOK_DECIDERS[envlp.event];
     const d = decider ? await decider(env, envlp) : { decision: 'allow' as const, message: 'İzin verildi (bilinmeyen hook).' };
-    // TEST: packet.status.update 'pending' döndüyse bekleyen paketi kaydet → ayar sayfası "çöz" butonu gate-resolve'u çağırır.
-    if (d.decision === 'pending' && envlp.event === 'packet.status.update' && envlp.target?.id) {
-      waitUntil(setPendingResolve(env, envlp.tenantId, { packetId: String(envlp.target.id), at: Date.now() }));
-    }
     return Response.json(d);
   }
 
