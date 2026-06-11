@@ -42,6 +42,13 @@
     <div class="body">
 
       <div class="sec">
+        <h2>Kurye-sahipli test paketi</h2>
+        <div class="step"><span>⓪</span><span>packet.status.update gate'i <b>yalnız kurye'nin oluşturduğu</b> pakette çalışır. Önce buradan bir tane oluştur, sonra panelde statüsünü değiştir.</span></div>
+        <button id="createBtn">📦 Test paketi oluştur</button>
+        <div id="createMsg" class="msg"></div>
+      </div>
+
+      <div class="sec">
         <h2>Gate kararı</h2>
         <div class="step"><span>①</span><span>Panelde paketin statüsünü değiştirmeyi denediğinde eklenti bu kararı döner:</span></div>
         <div class="seg">
@@ -84,6 +91,7 @@ var TOKEN='';
 var allowBtn=document.getElementById('allowBtn'), denyBtn=document.getElementById('denyBtn'), pendingBtn=document.getElementById('pendingBtn');
 var denyMsg=document.getElementById('denyMsg'), modeMsg=document.getElementById('modeMsg');
 var resolveAllowBtn=document.getElementById('resolveAllowBtn'), resolveDenyBtn=document.getElementById('resolveDenyBtn'), resolveMsg=document.getElementById('resolveMsg');
+var createBtn=document.getElementById('createBtn'), createMsg=document.getElementById('createMsg');
 
 function paintMode(mode){
   allowBtn.className   = mode==='allow'   ? 'active-allow' : '';
@@ -113,6 +121,15 @@ async function resolve(decision){
 }
 resolveAllowBtn.onclick=function(){resolve('allow')};
 resolveDenyBtn.onclick=function(){resolve('deny')};
+
+createBtn.onclick=async function(){
+  createMsg.className='msg'; createMsg.textContent='Oluşturuluyor…'; createBtn.disabled=true;
+  var r=await fetch('/api/status-test',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+TOKEN},body:JSON.stringify({createPacket:true})});
+  var j=await r.json();
+  if(j&&j.ok){createMsg.className='msg ok';createMsg.textContent='✓ Paket oluşturuldu: '+j.packetId+' — panelde aç, statüsünü değiştir.';}
+  else{createMsg.className='msg err';createMsg.textContent='Hata: '+((j&&(j.message||j.error))||'bilinmiyor');}
+  createBtn.disabled=false;
+};
 
 (async function init(){
   var t=await call('getSessionToken'); var jwt=t&&t.data&&t.data.token;
